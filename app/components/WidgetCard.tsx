@@ -8,6 +8,7 @@ const FAV_KEY = "favorites";
 
 export default function WidgetCard({ widget }: { widget: Widget }) {
   const [fav, setFav] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     const f = JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
@@ -31,11 +32,20 @@ export default function WidgetCard({ widget }: { widget: Widget }) {
   };
 
   return (
-    <Link href={`/widgets/${widget.slug}`}>
-      <div style={card}>
-        
+    <Link href={`/widgets/${widget.slug}`} style={{ textDecoration: "none" }}>
+      <div
+        style={{
+          ...card,
+          transform: hovered ? "translateY(-4px)" : "translateY(0px)",
+          boxShadow: hovered
+            ? "0 8px 25px rgba(0,0,0,0.08)"
+            : "0 2px 8px rgba(0,0,0,0.04)",
+        }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
         <div style={iconWrap}>
-          <span style={{ fontSize: 28 }}>{widget.icon}</span>
+          <span style={{ fontSize: 26 }}>{widget.icon}</span>
         </div>
 
         <div style={{ flex: 1 }}>
@@ -61,13 +71,13 @@ const card: React.CSSProperties = {
   borderRadius: 16,
   background: "#fff",
   border: "1px solid #eee",
-  transition: "all 0.2s",
+  transition: "all 0.2s ease",
   cursor: "pointer",
 };
 
 const iconWrap: React.CSSProperties = {
-  width: 40,
-  height: 40,
+  width: 42,
+  height: 42,
   borderRadius: 12,
   background: "#f5f7ff",
   display: "flex",
@@ -81,25 +91,3 @@ const star: React.CSSProperties = {
   fontSize: 18,
   cursor: "pointer",
 };
-
-const card: React.CSSProperties = {
-  display: "flex",
-  gap: 12,
-  alignItems: "center",
-  padding: 14,
-  borderRadius: 16,
-  background: "#fff",
-  border: "1px solid #eee",
-  transition: "all 0.2s ease",
-  cursor: "pointer",
-};
-
-<div
-  style={card}
-  onMouseEnter={(e) =>
-    (e.currentTarget.style.transform = "translateY(-4px)")
-  }
-  onMouseLeave={(e) =>
-    (e.currentTarget.style.transform = "translateY(0px)")
-  }
->
