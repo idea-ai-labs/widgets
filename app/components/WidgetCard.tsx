@@ -7,69 +7,77 @@ import { Widget } from "../data/widgets";
 const FAV_KEY = "favorites";
 
 export default function WidgetCard({ widget }: { widget: Widget }) {
-  const [favorite, setFavorite] = useState(false);
+  const [fav, setFav] = useState(false);
 
   useEffect(() => {
-    const favs = JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
-    setFavorite(favs.includes(widget.slug));
-  }, [widget.slug]);
+    const f = JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
+    setFav(f.includes(widget.slug));
+  }, []);
 
-  const toggleFavorite = (e: React.MouseEvent) => {
+  const toggleFav = (e: React.MouseEvent) => {
     e.preventDefault();
 
-    let favs = JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
+    let f = JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
 
-    if (favs.includes(widget.slug)) {
-      favs = favs.filter((f: string) => f !== widget.slug);
-      setFavorite(false);
+    if (f.includes(widget.slug)) {
+      f = f.filter((x: string) => x !== widget.slug);
+      setFav(false);
     } else {
-      favs.push(widget.slug);
-      setFavorite(true);
+      f.push(widget.slug);
+      setFav(true);
     }
 
-    localStorage.setItem(FAV_KEY, JSON.stringify(favs));
+    localStorage.setItem(FAV_KEY, JSON.stringify(f));
   };
 
   return (
     <Link href={`/widgets/${widget.slug}`}>
-      <div
-        style={{
-          borderRadius: 16,
-          padding: 20,
-          background: "#fff",
-          border: "1px solid #eee",
-          transition: "all 0.2s",
-          cursor: "pointer",
-          position: "relative",
-        }}
-        onMouseEnter={(e) =>
-          (e.currentTarget.style.transform = "translateY(-4px)")
-        }
-        onMouseLeave={(e) =>
-          (e.currentTarget.style.transform = "translateY(0px)")
-        }
-      >
-        {/* Favorite Star */}
-        <div
-          onClick={toggleFavorite}
-          style={{
-            position: "absolute",
-            top: 10,
-            right: 10,
-            fontSize: 18,
-          }}
-        >
-          {favorite ? "⭐" : "☆"}
+      <div style={card}>
+        
+        <div style={iconWrap}>
+          <span style={{ fontSize: 28 }}>{widget.icon}</span>
         </div>
 
-        <div style={{ fontSize: 42 }}>{widget.icon}</div>
+        <div style={{ flex: 1 }}>
+          <h3 style={{ margin: 0 }}>{widget.name}</h3>
+          <p style={{ margin: "4px 0", color: "#666", fontSize: 13 }}>
+            {widget.description}
+          </p>
+        </div>
 
-        <h3 style={{ margin: "10px 0 5px" }}>{widget.name}</h3>
-
-        <p style={{ fontSize: 14, color: "#666" }}>
-          {widget.description}
-        </p>
+        <button onClick={toggleFav} style={star}>
+          {fav ? "⭐" : "☆"}
+        </button>
       </div>
     </Link>
   );
 }
+
+const card: React.CSSProperties = {
+  display: "flex",
+  gap: 12,
+  alignItems: "center",
+  padding: 14,
+  borderRadius: 16,
+  background: "#fff",
+  border: "1px solid #eee",
+  transition: "all 0.2s",
+  cursor: "pointer",
+};
+
+const iconWrap: React.CSSProperties = {
+  width: 40,
+  height: 40,
+  borderRadius: 12,
+  background: "#f5f7ff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const star: React.CSSProperties = {
+  border: "none",
+  background: "transparent",
+  fontSize: 18,
+  cursor: "pointer",
+};
