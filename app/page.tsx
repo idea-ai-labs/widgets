@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { widgets, Widget } from "./data/widgets";
 import WidgetCard from "./components/WidgetCard";
 
+import CommandPalette from "./components/CommandPalette";
+
+<CommandPalette />
 const RECENT_KEY = "recent_widgets";
 const FAV_KEY = "favorites";
 
