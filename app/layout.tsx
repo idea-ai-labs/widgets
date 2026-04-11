@@ -1,7 +1,4 @@
-export const metadata = {
-  title: "Widget Store",
-  description: "Collection of useful widgets",
-};
+import ThemeProvider from "./components/ThemeProvider";
 
 export default function RootLayout({
   children,
@@ -10,8 +7,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, background: "#f8f9fb" }}>
-        {children}
+      <body style={{ margin: 0 }}>
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );
