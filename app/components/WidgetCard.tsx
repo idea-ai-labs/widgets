@@ -81,3 +81,25 @@ const star: React.CSSProperties = {
   fontSize: 18,
   cursor: "pointer",
 };
+
+const card: React.CSSProperties = {
+  display: "flex",
+  gap: 12,
+  alignItems: "center",
+  padding: 14,
+  borderRadius: 16,
+  background: "#fff",
+  border: "1px solid #eee",
+  transition: "all 0.2s ease",
+  cursor: "pointer",
+};
+
+<div
+  style={card}
+  onMouseEnter={(e) =>
+    (e.currentTarget.style.transform = "translateY(-4px)")
+  }
+  onMouseLeave={(e) =>
+    (e.currentTarget.style.transform = "translateY(0px)")
+  }
+>
