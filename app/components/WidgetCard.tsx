@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Widget } from "../data/widgets";
+import { useTheme } from "./ThemeProvider";
 
 const FAV_KEY = "favorites";
 
 export default function WidgetCard({ widget }: { widget: Widget }) {
   const [fav, setFav] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const { colors } = useTheme();
 
   useEffect(() => {
     const f = JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
@@ -35,59 +37,68 @@ export default function WidgetCard({ widget }: { widget: Widget }) {
     <Link href={`/widgets/${widget.slug}`} style={{ textDecoration: "none" }}>
       <div
         style={{
-          ...card,
-          transform: hovered ? "translateY(-4px)" : "translateY(0px)",
+          display: "flex",
+          gap: 14,
+          alignItems: "center",
+          padding: 16,
+          borderRadius: 18,
+          background: hovered ? colors.elevated : colors.card,
+          border: `1px solid ${colors.border}`,
+          transition: "all 0.25s ease",
+          cursor: "pointer",
+          transform: hovered ? "translateY(-6px)" : "translateY(0px)",
           boxShadow: hovered
-            ? "0 8px 25px rgba(0,0,0,0.08)"
-            : "0 2px 8px rgba(0,0,0,0.04)",
+            ? `0 12px 30px ${colors.glow}`
+            : "0 4px 12px rgba(0,0,0,0.05)",
         }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        <div style={iconWrap}>
-          <span style={{ fontSize: 26 }}>{widget.icon}</span>
+        {/* Icon */}
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 14,
+            background:
+              "linear-gradient(135deg, #6366f1, #8b5cf6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#fff",
+            fontSize: 22,
+          }}
+        >
+          {widget.icon}
         </div>
 
+        {/* Content */}
         <div style={{ flex: 1 }}>
           <h3 style={{ margin: 0 }}>{widget.name}</h3>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: 13 }}>
+          <p
+            style={{
+              margin: "4px 0",
+              color: colors.subtext,
+              fontSize: 13,
+            }}
+          >
             {widget.description}
           </p>
         </div>
 
-        <button onClick={toggleFav} style={star}>
+        {/* Favorite */}
+        <button
+          onClick={toggleFav}
+          style={{
+            border: "none",
+            background: "transparent",
+            fontSize: 18,
+            cursor: "pointer",
+          }}
+        >
           {fav ? "⭐" : "☆"}
         </button>
       </div>
     </Link>
   );
 }
-
-const card: React.CSSProperties = {
-  display: "flex",
-  gap: 12,
-  alignItems: "center",
-  padding: 14,
-  borderRadius: 16,
-  background: "#fff",
-  border: "1px solid #eee",
-  transition: "all 0.2s ease",
-  cursor: "pointer",
-};
-
-const iconWrap: React.CSSProperties = {
-  width: 42,
-  height: 42,
-  borderRadius: 12,
-  background: "#f5f7ff",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
-
-const star: React.CSSProperties = {
-  border: "none",
-  background: "transparent",
-  fontSize: 18,
-  cursor: "pointer",
-};
