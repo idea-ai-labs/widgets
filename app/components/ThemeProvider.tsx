@@ -3,13 +3,25 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { darkTheme, lightTheme } from "../styles/theme";
 
-const ThemeContext = createContext<any>(null);
+type ThemeMode = "light" | "dark";
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = useState<"light" | "dark">("light");
+type ThemeContextType = {
+  mode: ThemeMode;
+  toggle: () => void;
+  colors: typeof lightTheme;
+};
+
+const ThemeContext = createContext<ThemeContextType | null>(null);
+
+export function ThemeProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [mode, setMode] = useState<ThemeMode>("light");
 
   useEffect(() => {
-    const saved = localStorage.getItem("theme") as any;
+    const saved = localStorage.getItem("theme") as ThemeMode | null;
     if (saved) setMode(saved);
   }, []);
 
@@ -24,10 +36,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const colors = mode === "dark" ? darkTheme : lightTheme;
 
   return (
-    <ThemeContext.Provider value={{ mode, colors, toggle }}>
+    <ThemeContext.Provider value={{ mode, toggle, colors }}>
       {children}
     </ThemeContext.Provider>
   );
 }
 
-export const useTheme = () => useContext(ThemeContext);
+export function useTheme() {
+  const ctx = useContext(ThemeContext);
+  if (!ctx) {
+    throw new Error("useTheme must be used inside ThemeProvider");
+  }
+  return ctx;
+}
