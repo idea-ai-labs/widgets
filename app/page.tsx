@@ -34,7 +34,7 @@ export default function HomePage() {
       <main style={main(colors, loaded)}>
 
         {/* SEARCH */}
-        <div style={searchWrap(colors)}>
+        <div style={searchWrap}>
           <input
             placeholder="Search apps"
             value={search}
@@ -46,7 +46,7 @@ export default function HomePage() {
         {/* HERO */}
         <Hero widget={filtered[0] || widgets[0]} />
 
-        {/* FEATURED GRID (NO Row COMPONENT ANYMORE) */}
+        {/* FEATURED GRID */}
         <section style={section}>
           <h2 style={{ color: colors.text }}>Featured</h2>
 
@@ -77,23 +77,15 @@ function Hero({ widget }: any) {
           transform: visible ? "translateY(0)" : "translateY(16px)",
         }}
       >
-        <p style={{ color: "rgba(255,255,255,0.8)", fontSize: 12 }}>
-          TODAY
-        </p>
-
-        <h1 style={{ color: "#fff", fontSize: 28 }}>
-          {widget.name}
-        </h1>
-
-        <p style={{ color: "rgba(255,255,255,0.85)" }}>
-          {widget.description}
-        </p>
+        <p style={heroLabel}>TODAY</p>
+        <h1 style={heroTitle}>{widget.name}</h1>
+        <p style={heroDesc}>{widget.description}</p>
       </div>
     </Link>
   );
 }
 
-/* ================= CARD ================= */
+/* ================= CARD (FIXED — NO card() FUNCTION NEEDED) ================= */
 
 function Card({ widget }: any) {
   const { ref, visible } = useReveal();
@@ -104,7 +96,22 @@ function Card({ widget }: any) {
       <div
         ref={ref}
         style={{
-          ...card(colors),
+          minWidth: 260,
+          height: 160,
+          padding: 16,
+          borderRadius: 18,
+
+          background: colors.card,
+          border: `1px solid ${colors.border}`,
+          boxShadow: colors.shadow,
+
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+
+          transition: "all 0.25s ease",
+          cursor: "pointer",
+
           opacity: visible ? 1 : 0,
           transform: visible
             ? "translateY(0)"
@@ -132,13 +139,13 @@ function Card({ widget }: any) {
 const main = (colors: any, loaded: boolean): React.CSSProperties => ({
   paddingBottom: 80,
   background: colors.background,
-  opacity: loaded ? 1 : 0,
   transition: "all 0.3s ease",
+  opacity: loaded ? 1 : 0,
 });
 
-const searchWrap = (colors: any): React.CSSProperties => ({
+const searchWrap: React.CSSProperties = {
   padding: "12px 16px",
-});
+};
 
 const searchInput = (colors: any): React.CSSProperties => ({
   width: "100%",
@@ -171,3 +178,19 @@ const hero = (colors: any): React.CSSProperties => ({
   flexDirection: "column",
   justifyContent: "flex-end",
 });
+
+const heroLabel: React.CSSProperties = {
+  color: "rgba(255,255,255,0.8)",
+  fontSize: 12,
+  letterSpacing: 1.2,
+};
+
+const heroTitle: React.CSSProperties = {
+  color: "#fff",
+  fontSize: 28,
+  fontWeight: 700,
+};
+
+const heroDesc: React.CSSProperties = {
+  color: "rgba(255,255,255,0.85)",
+};
