@@ -1,5 +1,6 @@
 import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
+import TopNav from "./components/TopNav";
 
 export const metadata = {
   title: "Widget Store",
@@ -14,7 +15,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <TopNav />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
