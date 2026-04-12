@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "./ThemeProvider";
 
 export default function TopNav() {
+  const router = useRouter();
+  const pathname = usePathname();
   const { mode, toggle, colors } = useTheme();
-  const [tab, setTab] = useState<"Today" | "Apps" | "Search">("Today");
 
-  const tabs: ("Today" | "Apps" | "Search")[] = [
-    "Today",
-    "Apps",
-    "Search",
+  const tabs = [
+    { name: "Today", path: "/" },
+    { name: "Apps", path: "/apps" },
+    { name: "Search", path: "/search" },
   ];
 
   return (
@@ -19,18 +20,22 @@ export default function TopNav() {
         <div style={title(colors)}>App Store</div>
 
         <div style={row}>
-          {tabs.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                ...tabBtn(colors),
-                opacity: tab === t ? 1 : 0.45,
-              }}
-            >
-              {t}
-            </button>
-          ))}
+          {tabs.map((t) => {
+            const active = pathname === t.path;
+
+            return (
+              <button
+                key={t.path}
+                onClick={() => router.push(t.path)}
+                style={{
+                  ...tabBtn(colors),
+                  opacity: active ? 1 : 0.45,
+                }}
+              >
+                {t.name}
+              </button>
+            );
+          })}
 
           <button onClick={toggle} style={toggleBtn(colors)}>
             {mode === "dark" ? "🌙" : "☀️"}
@@ -41,9 +46,7 @@ export default function TopNav() {
   );
 }
 
-/* =========================
-   STYLES (FULL TYPE SAFE)
-   ========================= */
+/* ================= STYLES ================= */
 
 const navWrap: React.CSSProperties = {
   position: "sticky",
@@ -62,15 +65,15 @@ const blurBar = (colors: any): React.CSSProperties => ({
 const title = (colors: any): React.CSSProperties => ({
   fontSize: 34,
   fontWeight: 700,
-  letterSpacing: -0.8,
   color: colors.text,
+  letterSpacing: -0.8,
   marginBottom: 10,
 });
 
 const row: React.CSSProperties = {
   display: "flex",
-  alignItems: "center",
   gap: 14,
+  alignItems: "center",
 };
 
 const tabBtn = (colors: any): React.CSSProperties => ({
@@ -80,7 +83,6 @@ const tabBtn = (colors: any): React.CSSProperties => ({
   fontWeight: 600,
   color: colors.text,
   cursor: "pointer",
-  transition: "opacity 0.2s ease",
 });
 
 const toggleBtn = (colors: any): React.CSSProperties => ({
@@ -91,5 +93,4 @@ const toggleBtn = (colors: any): React.CSSProperties => ({
   borderRadius: 10,
   padding: "6px 10px",
   cursor: "pointer",
-  fontSize: 14,
 });
