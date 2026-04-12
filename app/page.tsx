@@ -1,18 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { widgets, Widget } from "./data/widgets";
-import WidgetCard from "./components/WidgetCard";
+import { useEffect, useState } from "react";
+import { widgets } from "./data/widgets";
+import Link from "next/link";
 
-import CommandPalette from "./components/CommandPalette";
-
-<CommandPalette />
 const RECENT_KEY = "recent_widgets";
 const FAV_KEY = "favorites";
 
 export default function HomePage() {
-  const [search, setSearch] = useState("");
-
   const [recent, setRecent] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
 
@@ -20,14 +15,6 @@ export default function HomePage() {
     setRecent(JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"));
     setFavorites(JSON.parse(localStorage.getItem(FAV_KEY) || "[]"));
   }, []);
-
-  const featured = widgets.find((w) => w.featured);
-
-  const filtered = useMemo(() => {
-    return widgets.filter((w) =>
-      w.name.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [search]);
 
   const recentWidgets = widgets.filter((w) =>
     recent.includes(w.slug)
@@ -38,139 +25,144 @@ export default function HomePage() {
   );
 
   return (
-    <main style={styles.page}>
-      
-      {/* HERO SECTION */}
-      <section style={styles.hero}>
-        <div>
-          <h1 style={styles.title}>🧩 Widget Store</h1>
-          <p style={styles.subtitle}>
-            Your personal toolkit of AI-powered utilities
-          </p>
+    <main style={{ paddingBottom: 40 }}>
 
-          <input
-            placeholder="Search widgets..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={styles.search}
-          />
-        </div>
-      </section>
+      {/* 📰 HERO */}
+      <EditorialCard widget={widgets[0]} />
 
-      {/* FEATURED */}
-      {featured && (
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>🔥 Featured</h2>
-
-          <div style={styles.featuredCard}>
-            <div style={{ fontSize: 42 }}>{featured.icon}</div>
-            <div>
-              <h3 style={{ margin: 0 }}>{featured.name}</h3>
-              <p style={{ margin: "6px 0", color: "#666" }}>
-                {featured.description}
-              </p>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* FAVORITES */}
-      {favoriteWidgets.length > 0 && (
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>⭐ Favorites</h2>
-          <div style={styles.grid}>
-            {favoriteWidgets.map((w) => (
-              <WidgetCard key={w.slug} widget={w} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* RECENT */}
-      {recentWidgets.length > 0 && (
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>🕒 Recently Used</h2>
-          <div style={styles.grid}>
-            {recentWidgets.map((w) => (
-              <WidgetCard key={w.slug} widget={w} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ALL WIDGETS */}
-      <section style={styles.section}>
-        <h2 style={styles.sectionTitle}>All Tools</h2>
-
-        <div style={styles.grid}>
-          {filtered.map((w) => (
-            <WidgetCard key={w.slug} widget={w} />
+      {/* 🔥 FEATURED */}
+      <Section title="Featured">
+        <SnapRow>
+          {widgets.map((w) => (
+            <MediumCard key={w.slug} widget={w} />
           ))}
-        </div>
-      </section>
+        </SnapRow>
+      </Section>
+
+      {/* ⭐ FAVORITES */}
+      {favoriteWidgets.length > 0 && (
+        <Section title="Favorites">
+          <SnapRow>
+            {favoriteWidgets.map((w) => (
+              <MediumCard key={w.slug} widget={w} />
+            ))}
+          </SnapRow>
+        </Section>
+      )}
+
+      {/* 🕒 RECENT */}
+      {recentWidgets.length > 0 && (
+        <Section title="Recently Used">
+          <SnapRow>
+            {recentWidgets.map((w) => (
+              <MediumCard key={w.slug} widget={w} />
+            ))}
+          </SnapRow>
+        </Section>
+      )}
     </main>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    maxWidth: 1100,
-    margin: "0 auto",
-    padding: "24px",
-    background: "#fafafa",
-  },
+/* ---------- SECTION ---------- */
 
-  hero: {
-    padding: "40px 20px",
-    borderRadius: 20,
-    background: "linear-gradient(135deg, #f0f4ff, #ffffff)",
-    border: "1px solid #eee",
-    marginBottom: 30,
-  },
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section style={{ padding: "20px 16px" }}>
+      <h2 style={{ marginBottom: 12 }}>{title}</h2>
+      {children}
+    </section>
+  );
+}
 
-  title: {
-    fontSize: 34,
-    margin: 0,
-    fontWeight: 700,
-  },
+/* ---------- SNAP ROW (KEY iOS FEEL) ---------- */
 
-  subtitle: {
-    color: "#666",
-    marginTop: 6,
-  },
+function SnapRow({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 14,
+        overflowX: "auto",
+        scrollSnapType: "x mandatory",   // 🧲 snap
+        scrollBehavior: "smooth",        // ✨ smooth
+        paddingBottom: 10,
+        paddingLeft: 4,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
-  search: {
-    marginTop: 16,
-    width: "100%",
-    padding: 12,
-    borderRadius: 12,
-    border: "1px solid #ddd",
-    fontSize: 14,
-  },
+/* ---------- HERO CARD ---------- */
 
-  section: {
-    marginTop: 30,
-  },
+function EditorialCard({ widget }: any) {
+  return (
+    <Link href={`/widgets/${widget.slug}`}>
+      <div
+        style={{
+          margin: 16,
+          height: 220,
+          borderRadius: 28,
+          padding: 24,
+          color: "#fff",
+          background:
+            "linear-gradient(135deg, #6366f1, #8b5cf6)",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          scrollSnapAlign: "start", // important
+          cursor: "pointer",
+        }}
+      >
+        <div>
+          <p style={{ opacity: 0.8 }}>FEATURED TOOL</p>
+          <h1 style={{ margin: "6px 0" }}>{widget.name}</h1>
+        </div>
 
-  sectionTitle: {
-    fontSize: 18,
-    marginBottom: 12,
-    fontWeight: 600,
-  },
+        <p style={{ opacity: 0.9 }}>{widget.description}</p>
+      </div>
+    </Link>
+  );
+}
 
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 16,
-  },
+/* ---------- MEDIUM CARD ---------- */
 
-  featuredCard: {
-    display: "flex",
-    gap: 16,
-    padding: 20,
-    borderRadius: 16,
-    background: "#fff",
-    border: "1px solid #eee",
-    alignItems: "center",
-  },
-};
+function MediumCard({ widget }: any) {
+  return (
+    <Link href={`/widgets/${widget.slug}`}>
+      <div
+        style={{
+          minWidth: 260,
+          height: 140,
+          borderRadius: 20,
+          padding: 16,
+          background:
+            "linear-gradient(135deg, #1f2937, #111827)",
+          color: "#fff",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          scrollSnapAlign: "start", // 🧲 required
+          cursor: "pointer",
+        }}
+      >
+        <div style={{ fontSize: 22 }}>{widget.icon}</div>
+
+        <div>
+          <h3 style={{ margin: 0 }}>{widget.name}</h3>
+          <p style={{ fontSize: 12, opacity: 0.7 }}>
+            {widget.description}
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
