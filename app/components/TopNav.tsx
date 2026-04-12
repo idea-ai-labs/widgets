@@ -1,16 +1,20 @@
 "use client";
 
-import { useTheme } from "./ThemeProvider";
 import { useState } from "react";
+import { useTheme } from "./ThemeProvider";
 
 export default function TopNav() {
   const { mode, toggle, colors } = useTheme();
-  const [tab, setTab] = useState("Today");
+  const [tab, setTab] = useState<"Today" | "Apps" | "Search">("Today");
 
-  const tabs = ["Today", "Apps", "Search"];
+  const tabs: ("Today" | "Apps" | "Search")[] = [
+    "Today",
+    "Apps",
+    "Search",
+  ];
 
   return (
-    <header style={navWrap(colors)}>
+    <header style={navWrap}>
       <div style={blurBar(colors)}>
         <div style={title(colors)}>App Store</div>
 
@@ -21,7 +25,7 @@ export default function TopNav() {
               onClick={() => setTab(t)}
               style={{
                 ...tabBtn(colors),
-                opacity: tab === t ? 1 : 0.5,
+                opacity: tab === t ? 1 : 0.45,
               }}
             >
               {t}
@@ -37,15 +41,17 @@ export default function TopNav() {
   );
 }
 
-/* ---------- STYLES ---------- */
+/* =========================
+   STYLES (FULL TYPE SAFE)
+   ========================= */
 
-const navWrap = () => ({
+const navWrap: React.CSSProperties = {
   position: "sticky",
   top: 0,
   zIndex: 50,
-});
+};
 
-const blurBar = (colors: any) => ({
+const blurBar = (colors: any): React.CSSProperties => ({
   backdropFilter: "blur(24px)",
   WebkitBackdropFilter: "blur(24px)",
   background: colors.blur,
@@ -53,35 +59,37 @@ const blurBar = (colors: any) => ({
   borderBottom: `1px solid ${colors.border}`,
 });
 
-const title = (colors: any) => ({
+const title = (colors: any): React.CSSProperties => ({
   fontSize: 34,
   fontWeight: 700,
-  color: colors.text,
   letterSpacing: -0.8,
+  color: colors.text,
   marginBottom: 10,
 });
 
-const row = {
+const row: React.CSSProperties = {
   display: "flex",
-  gap: 12,
   alignItems: "center",
+  gap: 14,
 };
 
-const tabBtn = (colors: any) => ({
+const tabBtn = (colors: any): React.CSSProperties => ({
   border: "none",
   background: "transparent",
   fontSize: 14,
   fontWeight: 600,
   color: colors.text,
   cursor: "pointer",
+  transition: "opacity 0.2s ease",
 });
 
-const toggleBtn = (colors: any) => ({
+const toggleBtn = (colors: any): React.CSSProperties => ({
   marginLeft: "auto",
-  border: "none",
+  border: `1px solid ${colors.border}`,
   background: colors.card,
+  color: colors.text,
   borderRadius: 10,
   padding: "6px 10px",
   cursor: "pointer",
-  color: colors.text,
+  fontSize: 14,
 });
