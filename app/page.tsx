@@ -37,7 +37,7 @@ export default function HomePage() {
   return (
     <main style={{ paddingBottom: 40 }}>
 
-      {/* 🔍 SEARCH BAR (iOS style) */}
+      {/* 🔍 SEARCH */}
       <div style={searchWrap(colors)}>
         <input
           placeholder="Search apps"
@@ -86,9 +86,15 @@ export default function HomePage() {
 
 /* ---------- SECTION ---------- */
 
-function Section({ title, children }: any) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section style={{ padding: "16px 20px" }}>
+    <section style={sectionStyle}>
       <h2 style={sectionTitle}>{title}</h2>
       {children}
     </section>
@@ -97,19 +103,9 @@ function Section({ title, children }: any) {
 
 /* ---------- SNAP ROW ---------- */
 
-function SnapRow({ children }: any) {
+function SnapRow({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 16,
-        overflowX: "auto",
-        scrollSnapType: "x mandatory",
-        scrollBehavior: "smooth",
-        paddingLeft: 20,
-        paddingRight: 20,
-      }}
-    >
+    <div style={snapRow}>
       {children}
     </div>
   );
@@ -125,7 +121,6 @@ function EditorialCard({ widget }: any) {
           <p style={heroLabel}>FEATURED</p>
           <h1 style={heroTitle}>{widget.name}</h1>
         </div>
-
         <p style={heroDesc}>{widget.description}</p>
       </div>
     </Link>
@@ -134,7 +129,13 @@ function EditorialCard({ widget }: any) {
 
 /* ---------- CARD ---------- */
 
-function MediumCard({ widget, colors }: any) {
+function MediumCard({
+  widget,
+  colors,
+}: {
+  widget: any;
+  colors: any;
+}) {
   return (
     <Link href={`/widgets/${widget.slug}`}>
       <div style={card(colors)}>
@@ -153,11 +154,11 @@ function MediumCard({ widget, colors }: any) {
 
 /* ---------- STYLES ---------- */
 
-const searchWrap = (colors: any) => ({
+const searchWrap = (colors: any): React.CSSProperties => ({
   padding: "12px 20px",
 });
 
-const searchInput = (colors: any) => ({
+const searchInput = (colors: any): React.CSSProperties => ({
   width: "100%",
   padding: "12px 16px",
   borderRadius: 14,
@@ -167,13 +168,26 @@ const searchInput = (colors: any) => ({
   outline: "none",
 });
 
-const sectionTitle = {
+const sectionStyle: React.CSSProperties = {
+  padding: "16px 20px",
+};
+
+const sectionTitle: React.CSSProperties = {
   fontSize: 20,
   fontWeight: 600,
   marginBottom: 10,
 };
 
-const heroCard = {
+const snapRow: React.CSSProperties = {
+  display: "flex",
+  gap: 16,
+  overflowX: "auto",
+  scrollSnapType: "x mandatory",
+  scrollBehavior: "smooth",
+  paddingLeft: 4,
+};
+
+const heroCard: React.CSSProperties = {
   margin: "12px 20px",
   height: 240,
   borderRadius: 28,
@@ -186,23 +200,23 @@ const heroCard = {
   scrollSnapAlign: "start",
 };
 
-const heroLabel = {
+const heroLabel: React.CSSProperties = {
   fontSize: 12,
   opacity: 0.8,
   letterSpacing: 1,
 };
 
-const heroTitle = {
+const heroTitle: React.CSSProperties = {
   margin: "6px 0",
   fontSize: 28,
   fontWeight: 700,
 };
 
-const heroDesc = {
+const heroDesc: React.CSSProperties = {
   opacity: 0.9,
 };
 
-const card = (colors: any) => ({
+const card = (colors: any): React.CSSProperties => ({
   minWidth: 260,
   height: 150,
   borderRadius: 20,
@@ -215,6 +229,6 @@ const card = (colors: any) => ({
   scrollSnapAlign: "start",
 });
 
-const iconBox = {
+const iconBox: React.CSSProperties = {
   fontSize: 22,
 };
