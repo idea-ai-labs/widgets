@@ -4,24 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 import { widgets } from "./data/widgets";
 import Link from "next/link";
 import TopNav from "./components/TopNav";
-import useReveal from "./hooks/useReveal";
+import useReveal from "./components/useReveal";
 import { useTheme } from "./components/ThemeProvider";
 
 const RECENT_KEY = "recent_widgets";
-const FAV_KEY = "favorites";
 
 export default function HomePage() {
   const { colors } = useTheme();
 
   const [search, setSearch] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
-  const [favorites, setFavorites] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     setLoaded(true);
     setRecent(JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"));
-    setFavorites(JSON.parse(localStorage.getItem(FAV_KEY) || "[]"));
   }, []);
 
   const filtered = useMemo(() => {
@@ -37,7 +34,7 @@ export default function HomePage() {
       <main style={main(colors, loaded)}>
 
         {/* SEARCH */}
-        <div style={searchWrap}>
+        <div style={searchWrap(colors)}>
           <input
             placeholder="Search apps"
             value={search}
@@ -49,20 +46,22 @@ export default function HomePage() {
         {/* HERO */}
         <Hero widget={filtered[0] || widgets[0]} />
 
-        {/* FEATURED */}
-        <Section title="Featured">
-          <Row>
+        {/* FEATURED GRID (NO Row COMPONENT ANYMORE) */}
+        <section style={section}>
+          <h2 style={{ color: colors.text }}>Featured</h2>
+
+          <div style={grid}>
             {filtered.map((w) => (
               <Card key={w.slug} widget={w} />
             ))}
-          </Row>
-        </Section>
+          </div>
+        </section>
       </main>
     </>
   );
 }
 
-/* ---------- HERO ---------- */
+/* ================= HERO ================= */
 
 function Hero({ widget }: any) {
   const { ref, visible } = useReveal();
@@ -75,7 +74,7 @@ function Hero({ widget }: any) {
         style={{
           ...hero(colors),
           opacity: visible ? 1 : 0,
-          transform: visible ? "translateY(0)" : "translateY(18px)",
+          transform: visible ? "translateY(0)" : "translateY(16px)",
         }}
       >
         <p style={{ color: "rgba(255,255,255,0.8)", fontSize: 12 }}>
@@ -94,28 +93,22 @@ function Hero({ widget }: any) {
   );
 }
 
-/* ---------- CARD ---------- */
+/* ================= CARD ================= */
 
 function Card({ widget }: any) {
   const { ref, visible } = useReveal();
   const { colors } = useTheme();
-  const [pressed, setPressed] = useState(false);
 
   return (
     <Link href={`/widgets/${widget.slug}`}>
       <div
         ref={ref}
-        onMouseDown={() => setPressed(true)}
-        onMouseUp={() => setPressed(false)}
-        onMouseLeave={() => setPressed(false)}
         style={{
           ...card(colors),
           opacity: visible ? 1 : 0,
           transform: visible
-            ? pressed
-              ? "scale(0.97)"
-              : "scale(1)"
-            : "translateY(14px)",
+            ? "translateY(0)"
+            : "translateY(12px)",
         }}
       >
         <div style={{ fontSize: 22 }}>{widget.icon}</div>
@@ -134,39 +127,18 @@ function Card({ widget }: any) {
   );
 }
 
-/* ---------- SECTION ---------- */
-
-function Section({ title, children }: any) {
-  const { ref, visible } = useReveal();
-  const { colors } = useTheme();
-
-  return (
-    <section
-      ref={ref}
-      style={{
-        padding: "18px 16px",
-        opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : "translateY(12px)",
-      }}
-    >
-      <h2 style={{ color: colors.text }}>{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-/* ---------- STYLES ---------- */
+/* ================= STYLES ================= */
 
 const main = (colors: any, loaded: boolean): React.CSSProperties => ({
   paddingBottom: 80,
   background: colors.background,
-  transition: "all 0.3s ease",
   opacity: loaded ? 1 : 0,
+  transition: "all 0.3s ease",
 });
 
-const searchWrap: React.CSSProperties = {
+const searchWrap = (colors: any): React.CSSProperties => ({
   padding: "12px 16px",
-};
+});
 
 const searchInput = (colors: any): React.CSSProperties => ({
   width: "100%",
@@ -178,27 +150,24 @@ const searchInput = (colors: any): React.CSSProperties => ({
   outline: "none",
 });
 
+const section: React.CSSProperties = {
+  padding: "18px 16px",
+};
+
+const grid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+  gap: 14,
+};
+
 const hero = (colors: any): React.CSSProperties => ({
   margin: "12px 16px",
   height: 320,
   borderRadius: 28,
   padding: 22,
   background:
-    "linear-gradient(135deg, #007aff, #5e5ce6, #af52de)",
+    "linear-gradient(135deg, #007aff, #5856d6, #af52de)",
   display: "flex",
   flexDirection: "column",
   justifyContent: "flex-end",
-});
-
-const card = (colors: any): React.CSSProperties => ({
-  minWidth: 260,
-  height: 160,
-  borderRadius: 22,
-  padding: 14,
-  background: colors.card,
-  border: `1px solid ${colors.border}`,
-  boxShadow: colors.shadow,
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "space-between",
 });
