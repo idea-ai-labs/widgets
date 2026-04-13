@@ -1,6 +1,6 @@
 "use client";
 
-import PromptGenerator from "../../PromptGenerator";
+import PromptGenerator from "./PromptGenerator";
 import { useEffect } from "react";
 import { useTheme } from "../../components/ThemeProvider";
 
