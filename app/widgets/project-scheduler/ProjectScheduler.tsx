@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Project, Task } from "./lib/types";
+import { Project, Task, TaskMode } from "./lib/types";
 import { calculate } from "./lib/scheduler";
 import { indent as indentFn, outdent as outdentFn } from "./lib/wbs";
 import { load, save } from "./lib/storage";
@@ -60,13 +60,21 @@ export default function ProjectScheduler() {
     [projects, activeId]
   );
 
-  /* ================= UPDATE ================= */
+  /* ================= UPDATE (with displayNo) ================= */
   const updateTasks = (tasks: Task[]) => {
-    const updated = calculate(tasks, projectStart);
+    // Derive displayNo from array index before scheduling
+    const tasksWithDisplayNo = tasks.map((t, idx) => ({
+      ...t,
+      displayNo: idx + 1,
+    }));
+
+    const updated = calculate(tasksWithDisplayNo, projectStart);
 
     setProjects((prev) =>
       prev.map((p) =>
-        p.id === activeProject.id ? { ...p, tasks: updated } : p
+        p.id === activeProject.id
+          ? { ...p, tasks: updated.map(t => ({ ...t, displayNo: t.displayNo })) }
+          : p
       )
     );
   };
