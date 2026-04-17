@@ -147,37 +147,91 @@ export default function ProjectScheduler() {
       }}
     >
       {/* HEADER */}
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          alignItems: "center",
-          marginBottom: 12,
-        }}
-      >
-        <div style={{ fontWeight: 600, fontSize: 16 }}>
-          📊 Project Scheduler
-        </div>
 
-        <select
-          value={activeProject.id}
-          onChange={(e) => setActiveId(e.target.value)}
-        >
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+<div
+  style={{
+    display: "flex",
+    gap: 10,
+    alignItems: "center",
+    marginBottom: 12,
+  }}
+>
+  <div style={{ fontWeight: 600, fontSize: 16 }}>
+    📊 Project Scheduler
+  </div>
 
-        <button onClick={addTask}>+ Task</button>
+  <select
+    value={activeProject.id}
+    onChange={(e) => setActiveId(e.target.value)}
+  >
+    {projects.map((p) => (
+      <option key={p.id} value={p.id}>
+        {p.name}
+      </option>
+    ))}
+  </select>
 
-        <input
-          type="date"
-          value={projectStart}
-          onChange={(e) => setProjectStart(e.target.value)}
-        />
-      </div>
+  {/* ✅ RESTORED */}
+  <button
+    onClick={() => {
+      const name = prompt("Project name?");
+      if (!name) return;
+
+      const newProject: Project = {
+        id: Date.now().toString(),
+        name,
+        createdAt: Date.now(),
+        tasks: [],
+      };
+
+      setProjects((prev) => [newProject, ...prev]);
+      setActiveId(newProject.id);
+    }}
+  >
+    + New Project
+  </button>
+
+  {/* IMPORT */}
+  <button onClick={() => fileRef.current?.click()}>
+    Import
+  </button>
+
+  {/* EXPORT */}
+  <button
+    onClick={() => {
+      const blob = new Blob([JSON.stringify(projects)], {
+        type: "application/json",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "projects.json";
+      a.click();
+    }}
+  >
+    Export
+  </button>
+
+  <input
+    ref={fileRef}
+    type="file"
+    accept="application/json"
+    style={{ display: "none" }}
+    onChange={(e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const data = JSON.parse(String(ev.target?.result));
+        setProjects(data);
+        setActiveId(data[0]?.id || null);
+      };
+      reader.readAsText(file);
+    }}
+  />
+</div>
 
       {/* TABLE */}
       <div style={tableWrap}>
