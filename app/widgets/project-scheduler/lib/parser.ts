@@ -1,28 +1,58 @@
+export type DependencyType = "FS" | "SS" | "FF" | "SF";
+
+export type LagUnit = "m" | "h" | "d" | "w" | "mo" | "pct";
+
 export type ParsedPred = {
   taskNo: number; // IMPORTANT: now uses display index
-  type: "FS" | "SS";
-  lag: number;
+  type: DependencyType;
+  lag: number; // negative = lead, positive = lag, 0 = none
+  lagUnit?: LagUnit; // omitted when no lag/lead is provided
 };
 
+const DEP_TYPE_RE = /(FS|SS|FF|SF)/i;
+const LAG_RE = /([+-])\s*(\d+(?:\.\d+)?)\s*(m|h|d|w|mo|%|pct)?/i;
+
+function normalizeLagUnit(raw?: string): LagUnit | undefined {
+  if (!raw) return undefined;
+  const v = raw.toLowerCase();
+  if (v === "%") return "pct";
+  if (v === "pct") return "pct";
+  if (v === "m") return "m";
+  if (v === "h") return "h";
+  if (v === "d") return "d";
+  if (v === "w") return "w";
+  if (v === "mo") return "mo";
+  return undefined;
+}
+
 export function parsePred(input?: string): ParsedPred[] {
-  if (!input) return [];
+  if (!input?.trim()) return [];
 
-  return input.split(",").map((raw) => {
-    const item = raw.trim();
+  return input
+    .split(",")
+    .map((raw) => {
+      const item = raw.trim();
+      if (!item) return null;
 
-    const lagMatch = item.match(/\+(\d+)d/);
-    const lag = lagMatch ? Number(lagMatch[1]) : 0;
+      const taskMatch = item.match(/^(\d+)/);
+      if (!taskMatch) return null;
 
-    const cleaned = item.replace(/\+\d+d/, "").trim();
+      const taskNo = Number(taskMatch[1]);
+      const typeMatch = item.match(DEP_TYPE_RE);
+      const type = (typeMatch?.[1]?.toUpperCase() as DependencyType) || "FS";
 
-    const m = cleaned.match(/(\d+)\s*(FS|SS)?/i);
+      const lagMatch = item.match(LAG_RE);
+      const lagSign = lagMatch?.[1] === "-" ? -1 : lagMatch?.[1] === "+" ? 1 : 0;
+      const lagValue = lagMatch ? Number(lagMatch[2]) : 0;
+      const lag = lagSign * lagValue;
+      const lagUnit = normalizeLagUnit(lagMatch?.[3]);
 
-    if (!m) return null;
-
-    return {
-      taskNo: Number(m[1]),
-      type: (m[2]?.toUpperCase() || "FS") as "FS" | "SS",
-      lag,
-    };
-  }).filter(Boolean) as ParsedPred[];
+      return {
+        taskNo,
+        type,
+        lag,
+        ...(lagMatch ? { lagUnit } : {}),
+      };
+    })
+    .filter((x): x is ParsedPred => Boolean(x));
 }
