@@ -1,5 +1,5 @@
 export type ParsedPred = {
-  id: number;
+  taskNo: number; // IMPORTANT: now uses display index
   type: "FS" | "SS";
   lag: number;
 };
@@ -15,13 +15,13 @@ export function parsePred(input?: string): ParsedPred[] {
 
     const cleaned = item.replace(/\+\d+d/, "").trim();
 
-    const m = cleaned.match(/(\d+)(FS|SS)?/);
+    const m = cleaned.match(/(\d+)\s*(FS|SS)?/i);
 
     if (!m) return null;
 
     return {
-      id: Number(m[1]),
-      type: (m[2] || "FS") as "FS" | "SS",
+      taskNo: Number(m[1]),
+      type: (m[2]?.toUpperCase() || "FS") as "FS" | "SS",
       lag,
     };
   }).filter(Boolean) as ParsedPred[];
