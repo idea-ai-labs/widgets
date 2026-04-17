@@ -7,8 +7,7 @@ import { calculate } from "./lib/scheduler";
 import { indent as indentFn, outdent as outdentFn } from "./lib/wbs";
 import { load, save } from "./lib/storage";
 
-/* ================= ID GENERATOR (FIXED SEQUENTIAL) ================= */
-
+/* ================= ID GENERATOR ================= */
 function getNextId(tasks: Task[]) {
   if (!tasks.length) return 1;
   return Math.max(...tasks.map((t) => t.id)) + 1;
@@ -22,7 +21,6 @@ export default function ProjectScheduler() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   /* ================= LOAD ================= */
-
   useEffect(() => {
     const data = load();
 
@@ -53,7 +51,6 @@ export default function ProjectScheduler() {
   }, []);
 
   /* ================= SAVE ================= */
-
   useEffect(() => {
     if (projects.length) save(projects);
   }, [projects]);
@@ -63,8 +60,7 @@ export default function ProjectScheduler() {
     [projects, activeId]
   );
 
-  /* ================= UPDATE ENGINE ================= */
-
+  /* ================= UPDATE ================= */
   const updateTasks = (tasks: Task[]) => {
     const updated = calculate(tasks, projectStart);
 
@@ -84,7 +80,6 @@ export default function ProjectScheduler() {
   };
 
   /* ================= TASK OPS ================= */
-
   const addTask = () => {
     const nextId = getNextId(activeProject.tasks);
 
@@ -101,8 +96,23 @@ export default function ProjectScheduler() {
     ]);
   };
 
-  /* ================= WBS ================= */
+  /* ================= PROJECT OPS ================= */
+  const addProject = () => {
+    const name = prompt("Project name?");
+    if (!name) return;
 
+    const newProject: Project = {
+      id: Date.now().toString(),
+      name,
+      createdAt: Date.now(),
+      tasks: [],
+    };
+
+    setProjects((prev) => [newProject, ...prev]);
+    setActiveId(newProject.id);
+  };
+
+  /* ================= WBS ================= */
   const indent = (t: Task) =>
     updateTasks(indentFn(activeProject.tasks, t.id));
 
@@ -111,8 +121,7 @@ export default function ProjectScheduler() {
 
   if (!activeProject) return null;
 
-  /* ================= STYLES (MODERN APPLE / SAAS GRID) ================= */
-
+  /* ================= STYLES ================= */
   const input: React.CSSProperties = {
     width: "100%",
     padding: "6px 8px",
@@ -129,13 +138,6 @@ export default function ProjectScheduler() {
     color: "#666",
   };
 
-  const tableWrap: React.CSSProperties = {
-    overflowX: "auto",
-    borderRadius: 12,
-    border: "1px solid #eee",
-    background: "#fff",
-  };
-
   return (
     <div
       style={{
@@ -147,105 +149,82 @@ export default function ProjectScheduler() {
       }}
     >
       {/* HEADER */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+        <div style={{ fontWeight: 600 }}>📊 Project Scheduler</div>
 
-<div
-  style={{
-    display: "flex",
-    gap: 10,
-    alignItems: "center",
-    marginBottom: 12,
-  }}
->
-  <div style={{ fontWeight: 600, fontSize: 16 }}>
-    📊 Project Scheduler
-  </div>
+        <select
+          value={activeProject.id}
+          onChange={(e) => setActiveId(e.target.value)}
+        >
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
 
-  <select
-    value={activeProject.id}
-    onChange={(e) => setActiveId(e.target.value)}
-  >
-    {projects.map((p) => (
-      <option key={p.id} value={p.id}>
-        {p.name}
-      </option>
-    ))}
-  </select>
+        <button onClick={addProject}>+ New Project</button>
 
-  {/* ✅ RESTORED */}
-  <button
-    onClick={() => {
-      const name = prompt("Project name?");
-      if (!name) return;
+        <button onClick={addTask}>+ Task</button>
 
-      const newProject: Project = {
-        id: Date.now().toString(),
-        name,
-        createdAt: Date.now(),
-        tasks: [],
-      };
+        {/* IMPORT */}
+        <button onClick={() => fileRef.current?.click()}>
+          Import
+        </button>
 
-      setProjects((prev) => [newProject, ...prev]);
-      setActiveId(newProject.id);
-    }}
-  >
-    + New Project
-  </button>
+        {/* EXPORT */}
+        <button
+          onClick={() => {
+            const blob = new Blob([JSON.stringify(projects)], {
+              type: "application/json",
+            });
 
-  {/* IMPORT */}
-  <button onClick={() => fileRef.current?.click()}>
-    Import
-  </button>
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "projects.json";
+            a.click();
+          }}
+        >
+          Export
+        </button>
 
-  {/* EXPORT */}
-  <button
-    onClick={() => {
-      const blob = new Blob([JSON.stringify(projects)], {
-        type: "application/json",
-      });
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "projects.json";
-      a.click();
-    }}
-  >
-    Export
-  </button>
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              const data = JSON.parse(String(ev.target?.result));
+              setProjects(data);
+              setActiveId(data[0]?.id || null);
+            };
+            reader.readAsText(file);
+          }}
+        />
+      </div>
 
-  <input
-    ref={fileRef}
-    type="file"
-    accept="application/json"
-    style={{ display: "none" }}
-    onChange={(e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const data = JSON.parse(String(ev.target?.result));
-        setProjects(data);
-        setActiveId(data[0]?.id || null);
-      };
-      reader.readAsText(file);
-    }}
-  />
-</div>
+      {/* ✅ PROJECT START (RESTORED) */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ marginRight: 8 }}>Project Start:</label>
+        <input
+          type="date"
+          value={projectStart}
+          onChange={(e) => setProjectStart(e.target.value)}
+        />
+      </div>
 
       {/* TABLE */}
-      <div style={tableWrap}>
+      <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
-            <tr
-              style={{
-                textAlign: "left",
-                fontSize: 12,
-                color: "#666",
-                background: "#fafafa",
-              }}
-            >
-              <th style={{ padding: 10 }}>ID</th>
+            <tr style={{ background: "#fafafa", fontSize: 12 }}>
+              <th>ID</th>
               <th>Mode</th>
               <th>Task</th>
               <th>Duration</th>
@@ -259,33 +238,22 @@ export default function ProjectScheduler() {
 
           <tbody>
             {activeProject.tasks.map((t, idx) => (
-              <tr
-                key={t.id}
-                style={{
-                  borderTop: "1px solid #f0f0f0",
-                }}
-              >
-                {/* SEQUENTIAL ID DISPLAY */}
-                <td style={{ padding: 10, color: "#555" }}>
-                  {idx + 1}
-                </td>
+              <tr key={t.id} style={{ borderTop: "1px solid #eee" }}>
+                <td>{idx + 1}</td>
 
-                {/* MODE */}
                 <td>
                   <select
                     value={t.mode}
                     onChange={(e) =>
                       updateTask(t.id, "mode", e.target.value as any)
                     }
-                    style={{ ...input, padding: 4 }}
                   >
                     <option value="auto">Auto</option>
                     <option value="manual">Manual</option>
                   </select>
                 </td>
 
-                {/* TASK */}
-                <td style={{ minWidth: 220 }}>
+                <td>
                   <input
                     value={t.name}
                     onChange={(e) =>
@@ -295,7 +263,6 @@ export default function ProjectScheduler() {
                   />
                 </td>
 
-                {/* DURATION */}
                 <td>
                   <input
                     type="number"
@@ -345,7 +312,6 @@ export default function ProjectScheduler() {
                   />
                 </td>
 
-                {/* PREDECESSORS */}
                 <td>
                   <input
                     value={t.predecessors || ""}
@@ -360,7 +326,6 @@ export default function ProjectScheduler() {
                   />
                 </td>
 
-                {/* % */}
                 <td>
                   <input
                     type="number"
@@ -376,7 +341,6 @@ export default function ProjectScheduler() {
                   />
                 </td>
 
-                {/* WBS */}
                 <td>
                   <button onClick={() => indent(t)}>→</button>
                   <button onClick={() => outdent(t)}>←</button>
