@@ -24,7 +24,7 @@ type Project = {
   createdAt: number;
 };
 
-const STORAGE_KEY = "projects_v9";
+const STORAGE_KEY = "projects_v10";
 
 /* ================= HELPERS ================= */
 
@@ -38,7 +38,7 @@ function format(d: Date) {
   return d.toISOString().split("T")[0];
 }
 
-/* ================= CORE SCHEDULING ================= */
+/* ================= SCHEDULING ================= */
 
 function calculate(tasks: Task[], projectStart: string) {
   const map = new Map(tasks.map((t) => [t.id, t]));
@@ -85,7 +85,7 @@ export default function ProjectScheduler() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [projectStart, setProjectStart] = useState("2026-01-01");
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   /* ================= LOAD ================= */
 
@@ -96,26 +96,27 @@ export default function ProjectScheduler() {
       const parsed = JSON.parse(saved);
       setProjects(parsed);
       setActiveId(parsed?.[0]?.id || null);
-    } else {
-      const fallback: Project = {
-        id: "1",
-        name: "My First Project",
-        createdAt: Date.now(),
-        tasks: [
-          {
-            id: 1,
-            name: "Start",
-            duration: 1,
-            percent: 100,
-            mode: "auto",
-            parentId: null,
-          },
-        ],
-      };
-
-      setProjects([fallback]);
-      setActiveId("1");
+      return;
     }
+
+    const fallback: Project = {
+      id: "1",
+      name: "My First Project",
+      createdAt: Date.now(),
+      tasks: [
+        {
+          id: 1,
+          name: "Start",
+          duration: 1,
+          percent: 100,
+          mode: "auto",
+          parentId: null,
+        },
+      ],
+    };
+
+    setProjects([fallback]);
+    setActiveId("1");
   }, []);
 
   /* ================= SAVE ================= */
@@ -156,9 +157,79 @@ export default function ProjectScheduler() {
     setActiveId(newProj.id);
   };
 
-  /* ================= IMPORT ================= */
+  /* ================= TASK OPS (FIXED CORE) ================= */
 
-  const importProjects = (file: File) => {
+  const updateTasks = (tasks: Task[]) => {
+    const recalculated = calculate(tasks, projectStart);
+
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === activeProject.id ? { ...p, tasks: recalculated } : p
+      )
+    );
+  };
+
+  const updateTask = (id: number, field: keyof Task, value: any) => {
+    const updated = activeProject.tasks.map((t) =>
+      t.id === id ? { ...t, [field]: value } : t
+    );
+
+    updateTasks(updated);
+  };
+
+  /* ================= ADD TASK (FIXED) ================= */
+
+  const addTask = () => {
+    const nextId =
+      activeProject.tasks.length > 0
+        ? Math.max(...activeProject.tasks.map((t) => t.id)) + 1
+        : 1;
+
+    const newTask: Task = {
+      id: nextId,
+      name: "New Task",
+      duration: 1,
+      percent: 0,
+      mode: "auto",
+      parentId: null,
+    };
+
+    updateTasks([...activeProject.tasks, newTask]);
+  };
+
+  /* ================= WBS (RESTORED) ================= */
+
+  const indent = (task: Task) => {
+    const prev = activeProject.tasks.find((t) => t.id === task.id - 1);
+    if (!prev) return;
+
+    updateTask(task.id, "parentId", prev.id);
+  };
+
+  const outdent = (task: Task) => {
+    updateTask(task.id, "parentId", null);
+  };
+
+  const toggleCollapse = (task: Task) => {
+    updateTask(task.id, "collapsed", !task.collapsed);
+  };
+
+  /* ================= IMPORT / EXPORT ================= */
+
+  const exportData = () => {
+    const blob = new Blob([JSON.stringify(projects, null, 2)], {
+      type: "application/json",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "projects.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importData = (file: File) => {
     const reader = new FileReader();
 
     reader.onload = (e) => {
@@ -177,49 +248,9 @@ export default function ProjectScheduler() {
     reader.readAsText(file);
   };
 
-  /* ================= EXPORT ================= */
-
-  const exportProjects = () => {
-    const blob = new Blob([JSON.stringify(projects, null, 2)], {
-      type: "application/json",
-    });
-
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "projects.json";
-    a.click();
-
-    URL.revokeObjectURL(url);
-  };
-
-  /* ================= TASK OPS ================= */
-
-  const updateTask = (id: number, field: keyof Task, value: any) => {
-    const updated = activeProject.tasks.map((t) =>
-      t.id === id ? { ...t, [field]: value } : t
-    );
-
-    const recalculated = calculate(updated, projectStart);
-
-    setProjects((prev) =>
-      prev.map((p) =>
-        p.id === activeProject.id ? { ...p, tasks: recalculated } : p
-      )
-    );
-  };
-
-  const addTask = () => {
-    const nextId =
-      Math.max(...activeProject.tasks.map((t) => t.id)) + 1;
-
-    updateTask(nextId, "name", "New Task");
-  };
+  if (!activeProject) return null;
 
   /* ================= UI ================= */
-
-  if (!activeProject) return null;
 
   return (
     <div style={styles.app}>
@@ -233,26 +264,25 @@ export default function ProjectScheduler() {
             onChange={(e) => setActiveId(e.target.value)}
           >
             {projects.map((p) => (
-              <option key={p.id}>{p.name}</option>
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
             ))}
           </select>
 
           <button onClick={createProject}>+ New</button>
+          <button onClick={exportData}>Export</button>
 
-          <button onClick={exportProjects}>Export</button>
-
-          <button onClick={() => fileInputRef.current?.click()}>
+          <button onClick={() => fileRef.current?.click()}>
             Import
           </button>
 
           <input
-            ref={fileInputRef}
+            ref={fileRef}
             type="file"
-            accept="application/json"
             hidden
             onChange={(e) =>
-              e.target.files?.[0] &&
-              importProjects(e.target.files[0])
+              e.target.files?.[0] && importData(e.target.files[0])
             }
           />
         </div>
@@ -264,7 +294,7 @@ export default function ProjectScheduler() {
         />
       </div>
 
-      {/* BODY */}
+      {/* TABLE */}
       <div style={styles.container}>
         <button onClick={addTask}>+ Add Task</button>
 
@@ -279,6 +309,7 @@ export default function ProjectScheduler() {
               <th>Mode</th>
               <th>Predecessors</th>
               <th>%</th>
+              <th>Actions</th>
             </tr>
           </thead>
 
@@ -348,16 +379,21 @@ export default function ProjectScheduler() {
                   <input
                     value={t.predecessors || ""}
                     onChange={(e) =>
-                      updateTask(
-                        t.id,
-                        "predecessors",
-                        e.target.value
-                      )
+                      updateTask(t.id, "predecessors", e.target.value)
                     }
                   />
                 </td>
 
                 <td>{t.percent}%</td>
+
+                {/* RESTORED ACTIONS */}
+                <td>
+                  <button onClick={() => indent(t)}>→</button>
+                  <button onClick={() => outdent(t)}>←</button>
+                  <button onClick={() => toggleCollapse(t)}>
+                    {t.collapsed ? "+" : "-"}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
