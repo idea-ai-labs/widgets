@@ -7,13 +7,19 @@ function addDays(date: Date, days: number) {
   return d;
 }
 
+/* ✅ UPDATED: Human-readable date format */
 function format(d: Date) {
-  return d.toISOString().split("T")[0];
+  const options: Intl.DateTimeFormatOptions = {
+    weekday: "short",
+    month: "numeric",
+    day: "numeric",
+    year: "2-digit",
+  };
+
+  return d.toLocaleDateString("en-US", options);
 }
 
 export function calculate(tasks: Task[], projectStart: string) {
-  const taskById = new Map(tasks.map((t) => [t.id, t]));
-
   return tasks.map((task, index) => {
     if (task.mode === "manual") return task;
 
@@ -22,8 +28,7 @@ export function calculate(tasks: Task[], projectStart: string) {
     const preds = parsePred(task.predecessors);
 
     preds.forEach((p) => {
-      // convert display taskNo → actual task
-      const refTask = tasks[p.taskNo - 1]; // IMPORTANT FIX
+      const refTask = tasks[p.taskNo - 1]; // uses display order
       if (!refTask) return;
 
       const finish = refTask.finish ? new Date(refTask.finish) : null;
