@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 /* ================= TYPES ================= */
 
@@ -24,9 +24,7 @@ type Project = {
   createdAt: number;
 };
 
-/* ================= STORAGE ================= */
-
-const STORAGE_KEY = "projects_v6";
+const STORAGE_KEY = "projects_v7";
 
 /* ================= HELPERS ================= */
 
@@ -42,13 +40,16 @@ function format(d: Date) {
 
 function parsePred(pred?: string) {
   if (!pred) return [];
-  return pred.split(",").map((p) => {
-    const m = p.match(/(\d+)(FS|SS)/);
-    return m ? { id: Number(m[1]), type: m[2] } : null;
-  }).filter(Boolean) as { id: number; type: string }[];
+  return pred
+    .split(",")
+    .map((p) => {
+      const m = p.match(/(\d+)(FS|SS)/);
+      return m ? { id: Number(m[1]), type: m[2] } : null;
+    })
+    .filter(Boolean) as { id: number; type: string }[];
 }
 
-/* ================= SCHEDULING (STABLE CORE) ================= */
+/* ================= CORE SCHEDULER ================= */
 
 function calculate(tasks: Task[], projectStart: string) {
   const map = new Map(tasks.map((t) => [t.id, t]));
@@ -81,30 +82,30 @@ function calculate(tasks: Task[], projectStart: string) {
   });
 }
 
-/* ================= WBS HELPERS ================= */
+/* ================= WBS ================= */
 
 function getLevel(tasks: Task[], task: Task): number {
   let level = 0;
-  let current = task;
+  let cur = task;
 
-  while (current.parentId) {
-    const parent = tasks.find((t) => t.id === current.parentId);
-    if (!parent) break;
+  while (cur.parentId) {
+    const p = tasks.find((t) => t.id === cur.parentId);
+    if (!p) break;
     level++;
-    current = parent;
+    cur = p;
   }
 
   return level;
 }
 
-function isHidden(tasks: Task[], task: Task): boolean {
-  let current = task;
+function isHidden(tasks: Task[], task: Task) {
+  let cur = task;
 
-  while (current.parentId) {
-    const parent = tasks.find((t) => t.id === current.parentId);
-    if (!parent) break;
-    if (parent.collapsed) return true;
-    current = parent;
+  while (cur.parentId) {
+    const p = tasks.find((t) => t.id === cur.parentId);
+    if (!p) break;
+    if (p.collapsed) return true;
+    cur = p;
   }
 
   return false;
@@ -117,29 +118,64 @@ export default function ProjectScheduler() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [projectStart, setProjectStart] = useState("2026-01-01");
 
-  /* LOAD */
+  /* ================= SAFE LOAD ================= */
+
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setProjects(parsed);
-      setActiveId(parsed[0]?.id || null);
-    } else {
-      createProject();
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+
+      if (saved) {
+        const parsed: Project[] = JSON.parse(saved);
+
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProjects(parsed);
+          setActiveId(parsed[0].id);
+          return;
+        }
+      }
+    } catch {
+      // ignore corrupted storage
     }
+
+    // ALWAYS fallback
+    const fallback: Project = {
+      id: "1",
+      name: "My First Project",
+      createdAt: Date.now(),
+      tasks: [
+        {
+          id: 1,
+          name: "Start",
+          duration: 1,
+          percent: 100,
+          mode: "auto",
+          parentId: null,
+        },
+      ],
+    };
+
+    setProjects([fallback]);
+    setActiveId("1");
   }, []);
 
-  /* SAVE */
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-  }, [projects]);
+  /* ================= SAFE ACTIVE PROJECT ================= */
 
-  const activeProject = projects.find((p) => p.id === activeId);
+  const activeProject = useMemo(() => {
+    return projects.find((p) => p.id === activeId) || projects[0];
+  }, [projects, activeId]);
+
+  /* ================= SAVE ================= */
+
+  useEffect(() => {
+    if (projects.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+    }
+  }, [projects]);
 
   /* ================= PROJECT OPS ================= */
 
   const createProject = () => {
-    const name = prompt("Enter project name:");
+    const name = prompt("Project name?");
     if (!name) return;
 
     const newProj: Project = {
@@ -168,21 +204,19 @@ export default function ProjectScheduler() {
     );
   };
 
+  /* ================= TASK OPS ================= */
+
   const updateTasks = (tasks: Task[]) => {
     const recalculated = calculate(tasks, projectStart);
 
     setProjects((prev) =>
       prev.map((p) =>
-        p.id === activeId ? { ...p, tasks: recalculated } : p
+        p.id === activeProject.id ? { ...p, tasks: recalculated } : p
       )
     );
   };
 
-  /* ================= TASK OPS ================= */
-
   const updateTask = (id: number, field: keyof Task, value: any) => {
-    if (!activeProject) return;
-
     const updated = activeProject.tasks.map((t) =>
       t.id === id ? { ...t, [field]: value } : t
     );
@@ -191,8 +225,6 @@ export default function ProjectScheduler() {
   };
 
   const addTask = () => {
-    if (!activeProject) return;
-
     const nextId =
       Math.max(...activeProject.tasks.map((t) => t.id)) + 1;
 
@@ -210,9 +242,7 @@ export default function ProjectScheduler() {
   };
 
   const indent = (task: Task) => {
-    const prev = activeProject?.tasks.find(
-      (t) => t.id === task.id - 1
-    );
+    const prev = activeProject.tasks.find((t) => t.id === task.id - 1);
     if (!prev) return;
 
     updateTask(task.id, "parentId", prev.id);
@@ -226,19 +256,27 @@ export default function ProjectScheduler() {
     updateTask(task.id, "collapsed", !task.collapsed);
   };
 
-  if (!activeProject) return null;
+  /* ================= SAFE RENDER GUARD ================= */
+
+  if (!activeProject) {
+    return (
+      <div style={{ padding: 20 }}>
+        Loading project...
+      </div>
+    );
+  }
 
   /* ================= UI ================= */
 
   return (
     <div style={styles.app}>
-      {/* TOP BAR */}
+      {/* HEADER */}
       <div style={styles.topBar}>
         <div style={styles.brand}>📊 Project Scheduler</div>
 
         <div style={styles.row}>
           <select
-            value={activeId || ""}
+            value={activeProject.id}
             onChange={(e) => setActiveId(e.target.value)}
           >
             {projects.map((p) => (
@@ -251,17 +289,14 @@ export default function ProjectScheduler() {
           <button onClick={createProject}>+ New</button>
         </div>
 
-        <div style={styles.row}>
-          <label>Start:</label>
-          <input
-            type="date"
-            value={projectStart}
-            onChange={(e) => setProjectStart(e.target.value)}
-          />
-        </div>
+        <input
+          type="date"
+          value={projectStart}
+          onChange={(e) => setProjectStart(e.target.value)}
+        />
       </div>
 
-      {/* MAIN */}
+      {/* BODY */}
       <div style={styles.container}>
         <button onClick={addTask}>+ Add Task</button>
 
@@ -269,12 +304,12 @@ export default function ProjectScheduler() {
           <thead>
             <tr>
               <th>ID</th>
-              <th>Task Name</th>
-              <th>Duration (Days)</th>
+              <th>Task</th>
+              <th>Duration</th>
               <th>Start</th>
               <th>Finish</th>
               <th>Mode</th>
-              <th>Predecessors (FS/SS)</th>
+              <th>Predecessors</th>
               <th>%</th>
             </tr>
           </thead>
@@ -321,39 +356,14 @@ export default function ProjectScheduler() {
                     />
                   </td>
 
-                  {/* START */}
-                  <td>
-                    <input
-                      type="date"
-                      value={t.start || ""}
-                      disabled={t.mode === "auto"}
-                      onChange={(e) =>
-                        updateTask(t.id, "start", e.target.value)
-                      }
-                    />
-                  </td>
-
-                  {/* FINISH */}
-                  <td>
-                    <input
-                      type="date"
-                      value={t.finish || ""}
-                      disabled={t.mode === "auto"}
-                      onChange={(e) =>
-                        updateTask(t.id, "finish", e.target.value)
-                      }
-                    />
-                  </td>
+                  <td>{t.start}</td>
+                  <td>{t.finish}</td>
 
                   <td>
                     <select
                       value={t.mode}
                       onChange={(e) =>
-                        updateTask(
-                          t.id,
-                          "mode",
-                          e.target.value as any
-                        )
+                        updateTask(t.id, "mode", e.target.value as any)
                       }
                     >
                       <option value="auto">Auto</option>
@@ -394,36 +404,21 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#f5f5f7",
     minHeight: "100vh",
   },
-
   topBar: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
-    padding: "12px 16px",
+    padding: 12,
     background: "white",
     borderBottom: "1px solid #e5e5e5",
-  },
-
-  brand: {
-    fontSize: 18,
-    fontWeight: 600,
-  },
-
-  row: {
-    display: "flex",
-    gap: 8,
     alignItems: "center",
   },
-
-  container: {
-    padding: 16,
-  },
-
+  brand: { fontSize: 18, fontWeight: 600 },
+  row: { display: "flex", gap: 8, alignItems: "center" },
+  container: { padding: 16 },
   table: {
     width: "100%",
     marginTop: 12,
     background: "white",
     borderRadius: 12,
-    borderCollapse: "collapse",
   },
 };
