@@ -24,7 +24,7 @@ type Project = {
   createdAt: number;
 };
 
-const STORAGE_KEY = "projects_v10";
+const STORAGE_KEY = "projects_v11";
 
 /* ================= HELPERS ================= */
 
@@ -38,7 +38,35 @@ function format(d: Date) {
   return d.toISOString().split("T")[0];
 }
 
-/* ================= SCHEDULING ================= */
+/* ================= PARSE PREDECESSORS (UPGRADED) ================= */
+
+function parsePred(input?: string) {
+  if (!input) return [];
+
+  return input.split(",").map((raw) => {
+    const item = raw.trim();
+
+    // Extract lag
+    const lagMatch = item.match(/\+(\d+)d/);
+    const lag = lagMatch ? Number(lagMatch[1]) : 0;
+
+    // Clean lag part
+    const cleaned = item.replace(/\+\d+d/, "").trim();
+
+    // Default FS if not specified
+    const typeMatch = cleaned.match(/(\d+)(FS|SS)?/);
+
+    if (!typeMatch) return null;
+
+    return {
+      id: Number(typeMatch[1]),
+      type: (typeMatch[2] || "FS") as "FS" | "SS",
+      lag,
+    };
+  }).filter(Boolean) as { id: number; type: "FS" | "SS"; lag: number }[];
+}
+
+/* ================= SCHEDULING ENGINE ================= */
 
 function calculate(tasks: Task[], projectStart: string) {
   const map = new Map(tasks.map((t) => [t.id, t]));
@@ -48,27 +76,22 @@ function calculate(tasks: Task[], projectStart: string) {
 
     let start = new Date(projectStart);
 
-    if (t.predecessors) {
-      const preds = t.predecessors
-        .split(",")
-        .map((p) => p.trim())
-        .map((p) => {
-          const m = p.match(/(\d+)(FS|SS)/);
-          return m ? { id: Number(m[1]), type: m[2] } : null;
-        })
-        .filter(Boolean) as { id: number; type: string }[];
+    const preds = parsePred(t.predecessors);
 
-      preds.forEach((p) => {
-        const pt = map.get(p.id);
-        if (!pt || !pt.finish) return;
+    preds.forEach((p) => {
+      const pt = map.get(p.id);
+      if (!pt || !pt.finish) return;
 
-        const pf = new Date(pt.finish);
+      const pf = new Date(pt.finish);
 
-        if (p.type === "FS") start = addDays(pf, 1);
-        if (p.type === "SS" && pt.start)
-          start = new Date(pt.start);
-      });
-    }
+      if (p.type === "FS") {
+        start = addDays(pf, 1 + p.lag);
+      }
+
+      if (p.type === "SS" && pt.start) {
+        start = addDays(new Date(pt.start), p.lag);
+      }
+    });
 
     return {
       ...t,
@@ -131,33 +154,7 @@ export default function ProjectScheduler() {
     return projects.find((p) => p.id === activeId) || projects[0];
   }, [projects, activeId]);
 
-  /* ================= PROJECT OPS ================= */
-
-  const createProject = () => {
-    const name = prompt("Project name?");
-    if (!name) return;
-
-    const newProj: Project = {
-      id: Date.now().toString(),
-      name,
-      createdAt: Date.now(),
-      tasks: [
-        {
-          id: 1,
-          name: "Start",
-          duration: 1,
-          percent: 100,
-          mode: "auto",
-          parentId: null,
-        },
-      ],
-    };
-
-    setProjects((p) => [newProj, ...p]);
-    setActiveId(newProj.id);
-  };
-
-  /* ================= TASK OPS (FIXED CORE) ================= */
+  /* ================= UPDATE ================= */
 
   const updateTasks = (tasks: Task[]) => {
     const recalculated = calculate(tasks, projectStart);
@@ -181,9 +178,7 @@ export default function ProjectScheduler() {
 
   const addTask = () => {
     const nextId =
-      activeProject.tasks.length > 0
-        ? Math.max(...activeProject.tasks.map((t) => t.id)) + 1
-        : 1;
+      Math.max(...activeProject.tasks.map((t) => t.id)) + 1;
 
     const newTask: Task = {
       id: nextId,
@@ -195,23 +190,6 @@ export default function ProjectScheduler() {
     };
 
     updateTasks([...activeProject.tasks, newTask]);
-  };
-
-  /* ================= WBS (RESTORED) ================= */
-
-  const indent = (task: Task) => {
-    const prev = activeProject.tasks.find((t) => t.id === task.id - 1);
-    if (!prev) return;
-
-    updateTask(task.id, "parentId", prev.id);
-  };
-
-  const outdent = (task: Task) => {
-    updateTask(task.id, "parentId", null);
-  };
-
-  const toggleCollapse = (task: Task) => {
-    updateTask(task.id, "collapsed", !task.collapsed);
   };
 
   /* ================= IMPORT / EXPORT ================= */
@@ -235,7 +213,6 @@ export default function ProjectScheduler() {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target?.result as string);
-
         if (Array.isArray(data)) {
           setProjects(data);
           setActiveId(data[0]?.id || null);
@@ -254,7 +231,7 @@ export default function ProjectScheduler() {
 
   return (
     <div style={styles.app}>
-      {/* TOP BAR */}
+      {/* HEADER */}
       <div style={styles.topBar}>
         <div style={styles.brand}>📊 Project Scheduler</div>
 
@@ -270,9 +247,8 @@ export default function ProjectScheduler() {
             ))}
           </select>
 
-          <button onClick={createProject}>+ New</button>
+          <button onClick={addTask}>+ Task</button>
           <button onClick={exportData}>Export</button>
-
           <button onClick={() => fileRef.current?.click()}>
             Import
           </button>
@@ -296,20 +272,17 @@ export default function ProjectScheduler() {
 
       {/* TABLE */}
       <div style={styles.container}>
-        <button onClick={addTask}>+ Add Task</button>
-
         <table style={styles.table}>
           <thead>
             <tr>
               <th>ID</th>
               <th>Task</th>
-              <th>Duration</th>
+              <th style={{ width: 90 }}>Dur</th>
               <th>Start</th>
               <th>Finish</th>
               <th>Mode</th>
               <th>Predecessors</th>
-              <th>%</th>
-              <th>Actions</th>
+              <th style={{ width: 120 }}>% Complete</th>
             </tr>
           </thead>
 
@@ -327,9 +300,11 @@ export default function ProjectScheduler() {
                   />
                 </td>
 
+                {/* Duration narrower */}
                 <td>
                   <input
                     type="number"
+                    style={{ width: 70 }}
                     value={t.duration}
                     onChange={(e) =>
                       updateTask(
@@ -378,21 +353,31 @@ export default function ProjectScheduler() {
                 <td>
                   <input
                     value={t.predecessors || ""}
+                    placeholder="e.g. 2FS+3d, 3"
                     onChange={(e) =>
-                      updateTask(t.id, "predecessors", e.target.value)
+                      updateTask(
+                        t.id,
+                        "predecessors",
+                        e.target.value
+                      )
                     }
                   />
                 </td>
 
-                <td>{t.percent}%</td>
-
-                {/* RESTORED ACTIONS */}
+                {/* % COMPLETE FIXED */}
                 <td>
-                  <button onClick={() => indent(t)}>→</button>
-                  <button onClick={() => outdent(t)}>←</button>
-                  <button onClick={() => toggleCollapse(t)}>
-                    {t.collapsed ? "+" : "-"}
-                  </button>
+                  <input
+                    type="number"
+                    value={t.percent}
+                    style={{ width: 80 }}
+                    onChange={(e) =>
+                      updateTask(
+                        t.id,
+                        "percent",
+                        Number(e.target.value)
+                      )
+                    }
+                  />
                 </td>
               </tr>
             ))}
@@ -425,7 +410,6 @@ const styles: Record<string, React.CSSProperties> = {
   container: { padding: 16 },
   table: {
     width: "100%",
-    marginTop: 12,
     background: "white",
     borderRadius: 12,
   },
