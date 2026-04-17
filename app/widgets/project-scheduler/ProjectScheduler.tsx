@@ -24,9 +24,9 @@ type Project = {
   createdAt: number;
 };
 
-const STORAGE_KEY = "projects_v7";
+const STORAGE_KEY = "projects_v8";
 
-/* ================= HELPERS ================= */
+/* ================= DATE HELPERS ================= */
 
 function addDays(date: Date, days: number) {
   const d = new Date(date);
@@ -43,18 +43,19 @@ function parsePred(pred?: string) {
   return pred
     .split(",")
     .map((p) => {
-      const m = p.match(/(\d+)(FS|SS)/);
+      const m = p.trim().match(/(\d+)(FS|SS)/);
       return m ? { id: Number(m[1]), type: m[2] } : null;
     })
     .filter(Boolean) as { id: number; type: string }[];
 }
 
-/* ================= CORE SCHEDULER ================= */
+/* ================= CORE SCHEDULING ================= */
 
 function calculate(tasks: Task[], projectStart: string) {
   const map = new Map(tasks.map((t) => [t.id, t]));
 
   return tasks.map((t) => {
+    // AUTO = system controlled
     if (t.mode === "manual") return t;
 
     let start = new Date(projectStart);
@@ -82,17 +83,17 @@ function calculate(tasks: Task[], projectStart: string) {
   });
 }
 
-/* ================= WBS ================= */
+/* ================= WBS HELPERS ================= */
 
 function getLevel(tasks: Task[], task: Task): number {
   let level = 0;
   let cur = task;
 
   while (cur.parentId) {
-    const p = tasks.find((t) => t.id === cur.parentId);
-    if (!p) break;
+    const parent = tasks.find((t) => t.id === cur.parentId);
+    if (!parent) break;
     level++;
-    cur = p;
+    cur = parent;
   }
 
   return level;
@@ -102,10 +103,10 @@ function isHidden(tasks: Task[], task: Task) {
   let cur = task;
 
   while (cur.parentId) {
-    const p = tasks.find((t) => t.id === cur.parentId);
-    if (!p) break;
-    if (p.collapsed) return true;
-    cur = p;
+    const parent = tasks.find((t) => t.id === cur.parentId);
+    if (!parent) break;
+    if (parent.collapsed) return true;
+    cur = parent;
   }
 
   return false;
@@ -118,7 +119,7 @@ export default function ProjectScheduler() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [projectStart, setProjectStart] = useState("2026-01-01");
 
-  /* ================= SAFE LOAD ================= */
+  /* ================= LOAD SAFE ================= */
 
   useEffect(() => {
     try {
@@ -133,11 +134,8 @@ export default function ProjectScheduler() {
           return;
         }
       }
-    } catch {
-      // ignore corrupted storage
-    }
+    } catch {}
 
-    // ALWAYS fallback
     const fallback: Project = {
       id: "1",
       name: "My First Project",
@@ -158,7 +156,7 @@ export default function ProjectScheduler() {
     setActiveId("1");
   }, []);
 
-  /* ================= SAFE ACTIVE PROJECT ================= */
+  /* ================= ACTIVE PROJECT ================= */
 
   const activeProject = useMemo(() => {
     return projects.find((p) => p.id === activeId) || projects[0];
@@ -167,7 +165,7 @@ export default function ProjectScheduler() {
   /* ================= SAVE ================= */
 
   useEffect(() => {
-    if (projects.length > 0) {
+    if (projects.length) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
     }
   }, [projects]);
@@ -198,20 +196,14 @@ export default function ProjectScheduler() {
     setActiveId(newProj.id);
   };
 
-  const renameProject = (id: string, name: string) => {
-    setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, name } : p))
-    );
-  };
-
-  /* ================= TASK OPS ================= */
+  /* ================= TASK UPDATE ================= */
 
   const updateTasks = (tasks: Task[]) => {
-    const recalculated = calculate(tasks, projectStart);
+    const updated = calculate(tasks, projectStart);
 
     setProjects((prev) =>
       prev.map((p) =>
-        p.id === activeProject.id ? { ...p, tasks: recalculated } : p
+        p.id === activeProject.id ? { ...p, tasks: updated } : p
       )
     );
   };
@@ -241,10 +233,11 @@ export default function ProjectScheduler() {
     ]);
   };
 
+  /* ================= WBS OPS ================= */
+
   const indent = (task: Task) => {
     const prev = activeProject.tasks.find((t) => t.id === task.id - 1);
     if (!prev) return;
-
     updateTask(task.id, "parentId", prev.id);
   };
 
@@ -256,15 +249,7 @@ export default function ProjectScheduler() {
     updateTask(task.id, "collapsed", !task.collapsed);
   };
 
-  /* ================= SAFE RENDER GUARD ================= */
-
-  if (!activeProject) {
-    return (
-      <div style={{ padding: 20 }}>
-        Loading project...
-      </div>
-    );
-  }
+  if (!activeProject) return null;
 
   /* ================= UI ================= */
 
@@ -280,23 +265,24 @@ export default function ProjectScheduler() {
             onChange={(e) => setActiveId(e.target.value)}
           >
             {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
+              <option key={p.id}>{p.name}</option>
             ))}
           </select>
 
           <button onClick={createProject}>+ New</button>
         </div>
 
-        <input
-          type="date"
-          value={projectStart}
-          onChange={(e) => setProjectStart(e.target.value)}
-        />
+        <div style={styles.row}>
+          <label>Start:</label>
+          <input
+            type="date"
+            value={projectStart}
+            onChange={(e) => setProjectStart(e.target.value)}
+          />
+        </div>
       </div>
 
-      {/* BODY */}
+      {/* TABLE */}
       <div style={styles.container}>
         <button onClick={addTask}>+ Add Task</button>
 
@@ -356,8 +342,29 @@ export default function ProjectScheduler() {
                     />
                   </td>
 
-                  <td>{t.start}</td>
-                  <td>{t.finish}</td>
+                  {/* START (FIXED) */}
+                  <td>
+                    <input
+                      type="date"
+                      value={t.start || ""}
+                      disabled={t.mode === "auto"}
+                      onChange={(e) =>
+                        updateTask(t.id, "start", e.target.value)
+                      }
+                    />
+                  </td>
+
+                  {/* FINISH (FIXED) */}
+                  <td>
+                    <input
+                      type="date"
+                      value={t.finish || ""}
+                      disabled={t.mode === "auto"}
+                      onChange={(e) =>
+                        updateTask(t.id, "finish", e.target.value)
+                      }
+                    />
+                  </td>
 
                   <td>
                     <select
@@ -375,11 +382,7 @@ export default function ProjectScheduler() {
                     <input
                       value={t.predecessors || ""}
                       onChange={(e) =>
-                        updateTask(
-                          t.id,
-                          "predecessors",
-                          e.target.value
-                        )
+                        updateTask(t.id, "predecessors", e.target.value)
                       }
                     />
                   </td>
