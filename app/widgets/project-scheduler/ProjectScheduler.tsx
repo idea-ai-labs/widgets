@@ -56,24 +56,7 @@ export default function ProjectScheduler() {
     [projects, activeId]
   );
 
-  /* ================= PROJECT OPS (FIXED + RESTORED) ================= */
-
-  const addProject = () => {
-    const name = prompt("Project name?");
-    if (!name) return;
-
-    const newProject: Project = {
-      id: Date.now().toString(),
-      name,
-      createdAt: Date.now(),
-      tasks: [],
-    };
-
-    setProjects((p) => [newProject, ...p]);
-    setActiveId(newProject.id);
-  };
-
-  /* ================= TASK OPS ================= */
+  /* ================= UPDATE ================= */
 
   const updateTasks = (tasks: Task[]) => {
     const updated = calculate(tasks, projectStart);
@@ -92,6 +75,8 @@ export default function ProjectScheduler() {
 
     updateTasks(updated);
   };
+
+  /* ================= TASK OPS ================= */
 
   const addTask = () => {
     const nextId =
@@ -120,113 +105,184 @@ export default function ProjectScheduler() {
   const outdent = (t: Task) =>
     updateTasks(outdentFn(activeProject.tasks, t.id));
 
-  /* ================= UI ================= */
-
   if (!activeProject) return null;
 
   return (
-    <div>
+    <div style={{ fontFamily: "system-ui", padding: 12 }}>
       {/* HEADER */}
-      <div style={{ display: "flex", gap: 10 }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
         <select
           value={activeProject.id}
           onChange={(e) => setActiveId(e.target.value)}
         >
           {projects.map((p) => (
-            <option key={p.id}>{p.name}</option>
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
           ))}
         </select>
 
-        {/* FIXED: NEW PROJECT BUTTON RESTORED */}
-        <button onClick={addProject}>+ New Project</button>
+        <button onClick={() => alert("Add Project")}>
+          + New Project
+        </button>
+
         <button onClick={addTask}>+ Task</button>
       </div>
 
-      {/* START DATE */}
-      <input
-        type="date"
-        value={projectStart}
-        onChange={(e) => setProjectStart(e.target.value)}
-      />
+      {/* PROJECT START */}
+      <div style={{ marginBottom: 10 }}>
+        <label>Project Start: </label>
+        <input
+          type="date"
+          value={projectStart}
+          onChange={(e) => setProjectStart(e.target.value)}
+        />
+      </div>
 
       {/* TABLE */}
-      <table>
-        <thead>
-          <tr>
-            <th>Task</th>
-            <th>Duration</th>
-            <th>Start</th>
-            <th>Finish</th>
-            <th>Predecessors</th>
-            <th>%</th>
-            <th>WBS</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {activeProject.tasks.map((t) => (
-            <tr key={t.id}>
-              <td>
-                <input
-                  value={t.name}
-                  onChange={(e) =>
-                    updateTask(t.id, "name", e.target.value)
-                  }
-                />
-              </td>
-
-              <td>
-                <input
-                  type="number"
-                  value={t.duration}
-                  onChange={(e) =>
-                    updateTask(
-                      t.id,
-                      "duration",
-                      Number(e.target.value)
-                    )
-                  }
-                />
-              </td>
-
-              <td>{t.start}</td>
-              <td>{t.finish}</td>
-
-              <td>
-                <input
-                  value={t.predecessors || ""}
-                  onChange={(e) =>
-                    updateTask(
-                      t.id,
-                      "predecessors",
-                      e.target.value
-                    )
-                  }
-                />
-              </td>
-
-              <td>
-                <input
-                  type="number"
-                  value={t.percent}
-                  onChange={(e) =>
-                    updateTask(
-                      t.id,
-                      "percent",
-                      Number(e.target.value)
-                    )
-                  }
-                />
-              </td>
-
-              <td>
-                <button onClick={() => indent(t)}>→</button>
-                <button onClick={() => outdent(t)}>←</button>
-              </td>
+      <div style={{ overflowX: "auto" }}>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            minWidth: 900,
+          }}
+        >
+          {/* ================= HEADER (FIXED) ================= */}
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left", minWidth: 220 }}>
+                Task
+              </th>
+              <th>Duration</th>
+              <th>Start</th>
+              <th>Finish</th>
+              <th>Mode</th>
+              <th>Predecessors</th>
+              <th>% Complete</th>
+              <th>WBS</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {activeProject.tasks.map((t) => (
+              <tr key={t.id}>
+                {/* ================= TASK COLUMN (FIXED) ================= */}
+                <td style={{ minWidth: 220 }}>
+                  <input
+                    value={t.name}
+                    placeholder="Task name"
+                    onChange={(e) =>
+                      updateTask(t.id, "name", e.target.value)
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "4px 6px",
+                      border: "1px solid #ddd",
+                      borderRadius: 6,
+                    }}
+                  />
+                </td>
+
+                <td>
+                  <input
+                    type="number"
+                    value={t.duration}
+                    onChange={(e) =>
+                      updateTask(
+                        t.id,
+                        "duration",
+                        Number(e.target.value)
+                      )
+                    }
+                    style={{ width: 70 }}
+                  />
+                </td>
+
+                {/* START */}
+                <td>
+                  <input
+                    type={t.mode === "manual" ? "date" : "text"}
+                    value={t.start || ""}
+                    readOnly={t.mode === "auto"}
+                    onChange={(e) =>
+                      updateTask(t.id, "start", e.target.value)
+                    }
+                    style={{
+                      width: "100%",
+                      background:
+                        t.mode === "auto" ? "#f3f3f3" : "white",
+                    }}
+                  />
+                </td>
+
+                {/* FINISH */}
+                <td>
+                  <input
+                    type={t.mode === "manual" ? "date" : "text"}
+                    value={t.finish || ""}
+                    readOnly={t.mode === "auto"}
+                    onChange={(e) =>
+                      updateTask(t.id, "finish", e.target.value)
+                    }
+                    style={{
+                      width: "100%",
+                      background:
+                        t.mode === "auto" ? "#f3f3f3" : "white",
+                    }}
+                  />
+                </td>
+
+                <td>
+                  <select
+                    value={t.mode}
+                    onChange={(e) =>
+                      updateTask(t.id, "mode", e.target.value as any)
+                    }
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                </td>
+
+                <td>
+                  <input
+                    value={t.predecessors || ""}
+                    onChange={(e) =>
+                      updateTask(
+                        t.id,
+                        "predecessors",
+                        e.target.value
+                      )
+                    }
+                    style={{ width: 120 }}
+                  />
+                </td>
+
+                <td>
+                  <input
+                    type="number"
+                    value={t.percent}
+                    onChange={(e) =>
+                      updateTask(
+                        t.id,
+                        "percent",
+                        Number(e.target.value)
+                      )
+                    }
+                    style={{ width: 70 }}
+                  />
+                </td>
+
+                <td>
+                  <button onClick={() => indent(t)}>→</button>
+                  <button onClick={() => outdent(t)}>←</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
