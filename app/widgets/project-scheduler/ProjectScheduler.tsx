@@ -12,6 +12,7 @@ type Task = {
   finish?: string;
   predecessors?: string;
   percent: number;
+  mode: "auto" | "manual";
 };
 
 type Project = {
@@ -23,7 +24,7 @@ type Project = {
 
 /* ================= STORAGE ================= */
 
-const STORAGE_KEY = "projects_v1";
+const STORAGE_KEY = "projects_v2";
 
 /* ================= HELPERS ================= */
 
@@ -45,24 +46,31 @@ function parsePred(pred?: string) {
   }).filter(Boolean) as { id: number; type: string }[];
 }
 
-function calculate(tasks: Task[]) {
+/* ================= CALC ================= */
+
+function calculate(tasks: Task[], projectStart: string) {
   const map = new Map(tasks.map((t) => [t.id, t]));
 
   tasks.forEach((t) => {
-    if (!t.predecessors) return;
+    // MANUAL → skip scheduling
+    if (t.mode === "manual") return;
 
-    let start = new Date();
-    const preds = parsePred(t.predecessors);
+    let start = new Date(projectStart);
 
-    preds.forEach((p) => {
-      const pt = map.get(p.id);
-      if (!pt || !pt.finish) return;
+    if (t.predecessors) {
+      const preds = parsePred(t.predecessors);
 
-      const pf = new Date(pt.finish);
+      preds.forEach((p) => {
+        const pt = map.get(p.id);
+        if (!pt || !pt.finish) return;
 
-      if (p.type === "FS") start = addDays(pf, 1);
-      if (p.type === "SS" && pt.start) start = new Date(pt.start);
-    });
+        const pf = new Date(pt.finish);
+
+        if (p.type === "FS") start = addDays(pf, 1);
+        if (p.type === "SS" && pt.start)
+          start = new Date(pt.start);
+      });
+    }
 
     t.start = format(start);
     t.finish = format(addDays(start, t.duration));
@@ -76,6 +84,7 @@ function calculate(tasks: Task[]) {
 export default function ProjectScheduler() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [projectStart, setProjectStart] = useState("2026-01-01");
 
   /* LOAD */
   useEffect(() => {
@@ -102,18 +111,18 @@ export default function ProjectScheduler() {
       name,
       createdAt: Date.now(),
       tasks: [
-        { id: 1, name: "Start", duration: 1, percent: 100 },
+        {
+          id: 1,
+          name: "Start",
+          duration: 1,
+          percent: 100,
+          mode: "auto",
+        },
       ],
     };
 
     setProjects((p) => [newProj, ...p]);
     setActiveId(newProj.id);
-  };
-
-  const deleteProject = (id: string) => {
-    const updated = projects.filter((p) => p.id !== id);
-    setProjects(updated);
-    setActiveId(updated[0]?.id || null);
   };
 
   const updateTasks = (tasks: Task[]) => {
@@ -131,35 +140,43 @@ export default function ProjectScheduler() {
   const updateTask = (id: number, field: keyof Task, value: any) => {
     if (!activeProject) return;
 
-    const updated = activeProject.tasks.map((t) =>
+    let updated = activeProject.tasks.map((t) =>
       t.id === id ? { ...t, [field]: value } : t
     );
 
-    updateTasks(calculate(updated));
+    updated = calculate(updated, projectStart);
+
+    updateTasks(updated);
   };
 
   const addTask = () => {
     if (!activeProject) return;
 
+    const nextId =
+      activeProject.tasks.length > 0
+        ? Math.max(...activeProject.tasks.map((t) => t.id)) + 1
+        : 1;
+
     updateTasks([
       ...activeProject.tasks,
       {
-        id: Date.now(),
+        id: nextId,
         name: "New Task",
         duration: 1,
         percent: 0,
+        mode: "auto",
       },
     ]);
   };
 
-  /* ================= UI ================= */
-
   if (!activeProject) return null;
+
+  /* ================= UI ================= */
 
   return (
     <div>
-      {/* PROJECT SELECTOR */}
-      <div style={{ marginBottom: 16 }}>
+      {/* PROJECT HEADER */}
+      <div style={{ marginBottom: 12 }}>
         <select
           value={activeId || ""}
           onChange={(e) => setActiveId(e.target.value)}
@@ -180,18 +197,21 @@ export default function ProjectScheduler() {
         >
           + New
         </button>
-
-        <button
-          onClick={() => deleteProject(activeId!)}
-          style={{ marginLeft: 8 }}
-        >
-          Delete
-        </button>
       </div>
 
-      {/* TASK GRID */}
+      {/* PROJECT START */}
+      <div style={{ marginBottom: 12 }}>
+        <label>Project Start: </label>
+        <input
+          type="date"
+          value={projectStart}
+          onChange={(e) => setProjectStart(e.target.value)}
+        />
+      </div>
+
       <button onClick={addTask}>+ Add Task</button>
 
+      {/* GRID */}
       <table style={{ width: "100%", marginTop: 12 }}>
         <thead>
           <tr>
@@ -200,6 +220,7 @@ export default function ProjectScheduler() {
             <th>Dur</th>
             <th>Start</th>
             <th>Finish</th>
+            <th>Mode</th>
             <th>Pred</th>
             <th>%</th>
           </tr>
@@ -229,8 +250,46 @@ export default function ProjectScheduler() {
                 />
               </td>
 
-              <td>{t.start}</td>
-              <td>{t.finish}</td>
+              {/* START (TEXT + CALENDAR) */}
+              <td>
+                <input
+                  type="date"
+                  value={t.start || ""}
+                  onChange={(e) =>
+                    updateTask(t.id, "start", e.target.value)
+                  }
+                  disabled={t.mode === "auto"}
+                />
+              </td>
+
+              {/* FINISH */}
+              <td>
+                <input
+                  type="date"
+                  value={t.finish || ""}
+                  onChange={(e) =>
+                    updateTask(t.id, "finish", e.target.value)
+                  }
+                  disabled={t.mode === "auto"}
+                />
+              </td>
+
+              {/* MODE */}
+              <td>
+                <select
+                  value={t.mode}
+                  onChange={(e) =>
+                    updateTask(
+                      t.id,
+                      "mode",
+                      e.target.value as "auto" | "manual"
+                    )
+                  }
+                >
+                  <option value="auto">Auto</option>
+                  <option value="manual">Manual</option>
+                </select>
+              </td>
 
               <td>
                 <input
