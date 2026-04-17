@@ -26,7 +26,7 @@ type Project = {
 
 /* ================= STORAGE ================= */
 
-const STORAGE_KEY = "projects_v5";
+const STORAGE_KEY = "projects_v6";
 
 /* ================= HELPERS ================= */
 
@@ -48,13 +48,12 @@ function parsePred(pred?: string) {
   }).filter(Boolean) as { id: number; type: string }[];
 }
 
-/* ================= CORE SCHEDULER (FIXED) ================= */
+/* ================= SCHEDULING (STABLE CORE) ================= */
 
 function calculate(tasks: Task[], projectStart: string) {
   const map = new Map(tasks.map((t) => [t.id, t]));
 
   return tasks.map((t) => {
-    // MANUAL = freeze dates
     if (t.mode === "manual") return t;
 
     let start = new Date(projectStart);
@@ -82,7 +81,7 @@ function calculate(tasks: Task[], projectStart: string) {
   });
 }
 
-/* ================= WBS ================= */
+/* ================= WBS HELPERS ================= */
 
 function getLevel(tasks: Task[], task: Task): number {
   let level = 0;
@@ -126,7 +125,7 @@ export default function ProjectScheduler() {
       setProjects(parsed);
       setActiveId(parsed[0]?.id || null);
     } else {
-      createProject("My First Project");
+      createProject();
     }
   }, []);
 
@@ -137,9 +136,12 @@ export default function ProjectScheduler() {
 
   const activeProject = projects.find((p) => p.id === activeId);
 
-  /* PROJECT OPS */
+  /* ================= PROJECT OPS ================= */
 
-  const createProject = (name: string) => {
+  const createProject = () => {
+    const name = prompt("Enter project name:");
+    if (!name) return;
+
     const newProj: Project = {
       id: Date.now().toString(),
       name,
@@ -151,6 +153,7 @@ export default function ProjectScheduler() {
           duration: 1,
           percent: 100,
           mode: "auto",
+          parentId: null,
         },
       ],
     };
@@ -175,7 +178,7 @@ export default function ProjectScheduler() {
     );
   };
 
-  /* TASK OPS */
+  /* ================= TASK OPS ================= */
 
   const updateTask = (id: number, field: keyof Task, value: any) => {
     if (!activeProject) return;
@@ -201,18 +204,26 @@ export default function ProjectScheduler() {
         duration: 1,
         percent: 0,
         mode: "auto",
+        parentId: null,
       },
     ]);
   };
 
-  const toggleCollapse = (task: Task) => {
-    updateTasks(
-      activeProject!.tasks.map((t) =>
-        t.id === task.id
-          ? { ...t, collapsed: !t.collapsed }
-          : t
-      )
+  const indent = (task: Task) => {
+    const prev = activeProject?.tasks.find(
+      (t) => t.id === task.id - 1
     );
+    if (!prev) return;
+
+    updateTask(task.id, "parentId", prev.id);
+  };
+
+  const outdent = (task: Task) => {
+    updateTask(task.id, "parentId", null);
+  };
+
+  const toggleCollapse = (task: Task) => {
+    updateTask(task.id, "collapsed", !task.collapsed);
   };
 
   if (!activeProject) return null;
@@ -225,11 +236,10 @@ export default function ProjectScheduler() {
       <div style={styles.topBar}>
         <div style={styles.brand}>📊 Project Scheduler</div>
 
-        <div style={styles.projectBar}>
+        <div style={styles.row}>
           <select
             value={activeId || ""}
             onChange={(e) => setActiveId(e.target.value)}
-            style={styles.select}
           >
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -238,23 +248,22 @@ export default function ProjectScheduler() {
             ))}
           </select>
 
-          <button onClick={() => createProject("New Project")}>
-            + New
-          </button>
+          <button onClick={createProject}>+ New</button>
         </div>
 
-        <input
-          type="date"
-          value={projectStart}
-          onChange={(e) => setProjectStart(e.target.value)}
-        />
+        <div style={styles.row}>
+          <label>Start:</label>
+          <input
+            type="date"
+            value={projectStart}
+            onChange={(e) => setProjectStart(e.target.value)}
+          />
+        </div>
       </div>
 
-      {/* TABLE */}
+      {/* MAIN */}
       <div style={styles.container}>
-        <button onClick={addTask} style={styles.primaryBtn}>
-          + Add Task
-        </button>
+        <button onClick={addTask}>+ Add Task</button>
 
         <table style={styles.table}>
           <thead>
@@ -266,7 +275,7 @@ export default function ProjectScheduler() {
               <th>Finish</th>
               <th>Mode</th>
               <th>Predecessors (FS/SS)</th>
-              <th>% Complete</th>
+              <th>%</th>
             </tr>
           </thead>
 
@@ -286,12 +295,14 @@ export default function ProjectScheduler() {
                         {t.collapsed ? "+" : "-"}
                       </button>
 
+                      <button onClick={() => indent(t)}>→</button>
+                      <button onClick={() => outdent(t)}>←</button>
+
                       <input
                         value={t.name}
                         onChange={(e) =>
                           updateTask(t.id, "name", e.target.value)
                         }
-                        style={styles.input}
                       />
                     </div>
                   </td>
@@ -307,12 +318,32 @@ export default function ProjectScheduler() {
                           Number(e.target.value)
                         )
                       }
-                      style={styles.input}
                     />
                   </td>
 
-                  <td>{t.start}</td>
-                  <td>{t.finish}</td>
+                  {/* START */}
+                  <td>
+                    <input
+                      type="date"
+                      value={t.start || ""}
+                      disabled={t.mode === "auto"}
+                      onChange={(e) =>
+                        updateTask(t.id, "start", e.target.value)
+                      }
+                    />
+                  </td>
+
+                  {/* FINISH */}
+                  <td>
+                    <input
+                      type="date"
+                      value={t.finish || ""}
+                      disabled={t.mode === "auto"}
+                      onChange={(e) =>
+                        updateTask(t.id, "finish", e.target.value)
+                      }
+                    />
+                  </td>
 
                   <td>
                     <select
@@ -340,7 +371,6 @@ export default function ProjectScheduler() {
                           e.target.value
                         )
                       }
-                      style={styles.input}
                     />
                   </td>
 
@@ -367,8 +397,8 @@ const styles: Record<string, React.CSSProperties> = {
 
   topBar: {
     display: "flex",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
     padding: "12px 16px",
     background: "white",
     borderBottom: "1px solid #e5e5e5",
@@ -379,14 +409,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
 
-  projectBar: {
+  row: {
     display: "flex",
     gap: 8,
     alignItems: "center",
-  },
-
-  select: {
-    padding: 6,
   },
 
   container: {
@@ -399,20 +425,5 @@ const styles: Record<string, React.CSSProperties> = {
     background: "white",
     borderRadius: 12,
     borderCollapse: "collapse",
-    overflow: "hidden",
-  },
-
-  input: {
-    border: "1px solid #ddd",
-    borderRadius: 6,
-    padding: 4,
-  },
-
-  primaryBtn: {
-    background: "#007aff",
-    color: "white",
-    border: "none",
-    padding: "8px 12px",
-    borderRadius: 8,
   },
 };
