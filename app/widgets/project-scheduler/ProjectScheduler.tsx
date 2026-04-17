@@ -7,6 +7,13 @@ import { calculate } from "./lib/scheduler";
 import { indent as indentFn, outdent as outdentFn } from "./lib/wbs";
 import { load, save } from "./lib/storage";
 
+/* ================= ID GENERATOR (FIXED SEQUENTIAL) ================= */
+
+function getNextId(tasks: Task[]) {
+  if (!tasks.length) return 1;
+  return Math.max(...tasks.map((t) => t.id)) + 1;
+}
+
 export default function ProjectScheduler() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -27,7 +34,7 @@ export default function ProjectScheduler() {
         tasks: [
           {
             id: 1,
-            name: "Start",
+            name: "Project Start",
             duration: 1,
             percent: 100,
             mode: "auto",
@@ -56,7 +63,7 @@ export default function ProjectScheduler() {
     [projects, activeId]
   );
 
-  /* ================= UPDATE ================= */
+  /* ================= UPDATE ENGINE ================= */
 
   const updateTasks = (tasks: Task[]) => {
     const updated = calculate(tasks, projectStart);
@@ -79,10 +86,7 @@ export default function ProjectScheduler() {
   /* ================= TASK OPS ================= */
 
   const addTask = () => {
-    const nextId =
-      activeProject.tasks.length > 0
-        ? Math.max(...activeProject.tasks.map((t) => t.id)) + 1
-        : 1;
+    const nextId = getNextId(activeProject.tasks);
 
     updateTasks([
       ...activeProject.tasks,
@@ -107,28 +111,54 @@ export default function ProjectScheduler() {
 
   if (!activeProject) return null;
 
-  /* ================= INPUT STYLE FIX (REMOVES DARK BORDER ISSUE) ================= */
+  /* ================= STYLES (MODERN APPLE / SAAS GRID) ================= */
 
-  const inputStyle: React.CSSProperties = {
+  const input: React.CSSProperties = {
     width: "100%",
-    padding: "4px 6px",
-    border: "1px solid #e5e5e5",
-    borderRadius: 6,
-    outline: "none",
+    padding: "6px 8px",
+    border: "1px solid #e6e6e6",
+    borderRadius: 8,
     fontSize: 13,
+    outline: "none",
     background: "#fff",
   };
 
-  const readonlyStyle: React.CSSProperties = {
-    ...inputStyle,
-    background: "#f5f5f7",
-    color: "#333",
+  const inputReadonly: React.CSSProperties = {
+    ...input,
+    background: "#f6f7f9",
+    color: "#666",
+  };
+
+  const tableWrap: React.CSSProperties = {
+    overflowX: "auto",
+    borderRadius: 12,
+    border: "1px solid #eee",
+    background: "#fff",
   };
 
   return (
-    <div style={{ fontFamily: "system-ui", padding: 12 }}>
+    <div
+      style={{
+        fontFamily:
+          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        background: "#f5f6f8",
+        minHeight: "100vh",
+        padding: 16,
+      }}
+    >
       {/* HEADER */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          alignItems: "center",
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ fontWeight: 600, fontSize: 16 }}>
+          📊 Project Scheduler
+        </div>
+
         <select
           value={activeProject.id}
           onChange={(e) => setActiveId(e.target.value)}
@@ -141,11 +171,7 @@ export default function ProjectScheduler() {
         </select>
 
         <button onClick={addTask}>+ Task</button>
-      </div>
 
-      {/* PROJECT START */}
-      <div style={{ marginBottom: 10 }}>
-        <label>Project Start: </label>
         <input
           type="date"
           value={projectStart}
@@ -154,44 +180,50 @@ export default function ProjectScheduler() {
       </div>
 
       {/* TABLE */}
-      <div style={{ overflowX: "auto" }}>
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            minWidth: 1000,
-          }}
-        >
-          {/* HEADER */}
+      <div style={tableWrap}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
-            <tr>
-              <th>ID</th>
+            <tr
+              style={{
+                textAlign: "left",
+                fontSize: 12,
+                color: "#666",
+                background: "#fafafa",
+              }}
+            >
+              <th style={{ padding: 10 }}>ID</th>
               <th>Mode</th>
-              <th style={{ textAlign: "left", minWidth: 200 }}>
-                Task
-              </th>
+              <th>Task</th>
               <th>Duration</th>
               <th>Start</th>
               <th>Finish</th>
               <th>Predecessors</th>
-              <th>% Complete</th>
+              <th>%</th>
               <th>WBS</th>
             </tr>
           </thead>
 
           <tbody>
-            {activeProject.tasks.map((t) => (
-              <tr key={t.id}>
-                {/* ================= ID ================= */}
-                <td>{t.id}</td>
+            {activeProject.tasks.map((t, idx) => (
+              <tr
+                key={t.id}
+                style={{
+                  borderTop: "1px solid #f0f0f0",
+                }}
+              >
+                {/* SEQUENTIAL ID DISPLAY */}
+                <td style={{ padding: 10, color: "#555" }}>
+                  {idx + 1}
+                </td>
 
-                {/* ================= MODE (MOVED TO 2ND COL) ================= */}
+                {/* MODE */}
                 <td>
                   <select
                     value={t.mode}
                     onChange={(e) =>
                       updateTask(t.id, "mode", e.target.value as any)
                     }
+                    style={{ ...input, padding: 4 }}
                   >
                     <option value="auto">Auto</option>
                     <option value="manual">Manual</option>
@@ -199,13 +231,13 @@ export default function ProjectScheduler() {
                 </td>
 
                 {/* TASK */}
-                <td>
+                <td style={{ minWidth: 220 }}>
                   <input
                     value={t.name}
                     onChange={(e) =>
                       updateTask(t.id, "name", e.target.value)
                     }
-                    style={inputStyle}
+                    style={input}
                   />
                 </td>
 
@@ -221,11 +253,11 @@ export default function ProjectScheduler() {
                         Number(e.target.value)
                       )
                     }
-                    style={{ ...inputStyle, width: 70 }}
+                    style={{ ...input, width: 70 }}
                   />
                 </td>
 
-                {/* START (REDUCED WIDTH + FIXED STYLE) */}
+                {/* START */}
                 <td>
                   <input
                     type={t.mode === "manual" ? "date" : "text"}
@@ -236,13 +268,13 @@ export default function ProjectScheduler() {
                     }
                     style={
                       t.mode === "auto"
-                        ? readonlyStyle
-                        : inputStyle
+                        ? inputReadonly
+                        : input
                     }
                   />
                 </td>
 
-                {/* FINISH (REDUCED WIDTH + FIXED STYLE) */}
+                {/* FINISH */}
                 <td>
                   <input
                     type={t.mode === "manual" ? "date" : "text"}
@@ -253,8 +285,8 @@ export default function ProjectScheduler() {
                     }
                     style={
                       t.mode === "auto"
-                        ? readonlyStyle
-                        : inputStyle
+                        ? inputReadonly
+                        : input
                     }
                   />
                 </td>
@@ -270,11 +302,11 @@ export default function ProjectScheduler() {
                         e.target.value
                       )
                     }
-                    style={{ ...inputStyle, width: 120 }}
+                    style={{ ...input, width: 120 }}
                   />
                 </td>
 
-                {/* % COMPLETE */}
+                {/* % */}
                 <td>
                   <input
                     type="number"
@@ -286,7 +318,7 @@ export default function ProjectScheduler() {
                         Number(e.target.value)
                       )
                     }
-                    style={{ ...inputStyle, width: 70 }}
+                    style={{ ...input, width: 60 }}
                   />
                 </td>
 
