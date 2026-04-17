@@ -4,7 +4,7 @@ export type TaskMode = "auto" | "manual";
 
 export type Task = {
   id: number; // stable identifier (existing)
-  displayNo: number; // row number for UI / parsing; you can derive this in UI
+  displayNo?: number; // optional, we'll derive in code
   name: string;
   duration: number;
   start?: string;
