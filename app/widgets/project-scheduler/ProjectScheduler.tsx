@@ -13,6 +13,8 @@ type Task = {
   predecessors?: string;
   percent: number;
   mode: "auto" | "manual";
+  parentId?: number | null;
+  collapsed?: boolean;
 };
 
 type Project = {
@@ -24,7 +26,7 @@ type Project = {
 
 /* ================= STORAGE ================= */
 
-const STORAGE_KEY = "projects_v2";
+const STORAGE_KEY = "projects_v4";
 
 /* ================= HELPERS ================= */
 
@@ -52,7 +54,6 @@ function calculate(tasks: Task[], projectStart: string) {
   const map = new Map(tasks.map((t) => [t.id, t]));
 
   tasks.forEach((t) => {
-    // MANUAL → skip scheduling
     if (t.mode === "manual") return;
 
     let start = new Date(projectStart);
@@ -76,7 +77,59 @@ function calculate(tasks: Task[], projectStart: string) {
     t.finish = format(addDays(start, t.duration));
   });
 
+  return tasks;
+}
+
+/* ================= WBS HELPERS ================= */
+
+function getLevel(tasks: Task[], task: Task): number {
+  let level = 0;
+  let current = task;
+
+  while (current.parentId) {
+    const parent = tasks.find((t) => t.id === current.parentId);
+    if (!parent) break;
+    level++;
+    current = parent;
+  }
+
+  return level;
+}
+
+function getChildren(tasks: Task[], parentId: number): Task[] {
+  return tasks.filter((t) => t.parentId === parentId);
+}
+
+function rollup(tasks: Task[]) {
+  const map = new Map(tasks.map((t) => [t.id, t]));
+
+  tasks.forEach((t) => {
+    const children = tasks.filter((c) => c.parentId === t.id);
+
+    if (children.length > 0) {
+      const avg =
+        children.reduce((sum, c) => sum + c.percent, 0) /
+        children.length;
+
+      t.percent = Math.round(avg);
+    }
+  });
+
   return [...tasks];
+}
+
+function isHidden(tasks: Task[], task: Task): boolean {
+  let current = task;
+
+  while (current.parentId) {
+    const parent = tasks.find((t) => t.id === current.parentId);
+    if (!parent) break;
+
+    if (parent.collapsed) return true;
+    current = parent;
+  }
+
+  return false;
 }
 
 /* ================= COMPONENT ================= */
@@ -125,6 +178,14 @@ export default function ProjectScheduler() {
     setActiveId(newProj.id);
   };
 
+  const renameProject = (id: string, name: string) => {
+    setProjects((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, name } : p))
+    );
+  };
+
+  const activeProject = projects.find((p) => p.id === activeId);
+
   const updateTasks = (tasks: Task[]) => {
     setProjects((prev) =>
       prev.map((p) =>
@@ -132,8 +193,6 @@ export default function ProjectScheduler() {
       )
     );
   };
-
-  const activeProject = projects.find((p) => p.id === activeId);
 
   /* TASK OPS */
 
@@ -145,6 +204,7 @@ export default function ProjectScheduler() {
     );
 
     updated = calculate(updated, projectStart);
+    updated = rollup(updated);
 
     updateTasks(updated);
   };
@@ -153,9 +213,7 @@ export default function ProjectScheduler() {
     if (!activeProject) return;
 
     const nextId =
-      activeProject.tasks.length > 0
-        ? Math.max(...activeProject.tasks.map((t) => t.id)) + 1
-        : 1;
+      Math.max(...activeProject.tasks.map((t) => t.id)) + 1;
 
     updateTasks([
       ...activeProject.tasks,
@@ -169,150 +227,159 @@ export default function ProjectScheduler() {
     ]);
   };
 
+  const indentTask = (task: Task) => {
+    const prev = activeProject?.tasks.find(
+      (t) => t.id === task.id - 1
+    );
+    if (!prev) return;
+
+    updateTasks(
+      activeProject!.tasks.map((t) =>
+        t.id === task.id ? { ...t, parentId: prev.id } : t
+      )
+    );
+  };
+
+  const outdentTask = (task: Task) => {
+    updateTasks(
+      activeProject!.tasks.map((t) =>
+        t.id === task.id ? { ...t, parentId: null } : t
+      )
+    );
+  };
+
+  const toggleCollapse = (task: Task) => {
+    updateTasks(
+      activeProject!.tasks.map((t) =>
+        t.id === task.id
+          ? { ...t, collapsed: !t.collapsed }
+          : t
+      )
+    );
+  };
+
   if (!activeProject) return null;
 
-  /* ================= UI ================= */
-
   return (
-    <div>
-      {/* PROJECT HEADER */}
-      <div style={{ marginBottom: 12 }}>
-        <select
-          value={activeId || ""}
-          onChange={(e) => setActiveId(e.target.value)}
-        >
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-
-        <button
-          onClick={() => {
-            const name = prompt("Project name?");
-            if (name) createProject(name);
-          }}
-          style={{ marginLeft: 8 }}
-        >
+    <div style={{ display: "flex" }}>
+      {/* SIDEBAR */}
+      <div style={{ width: 240, borderRight: "1px solid #ddd", padding: 10 }}>
+        <h3>Projects</h3>
+        {projects.map((p) => (
+          <div key={p.id}>
+            <input
+              value={p.name}
+              onChange={(e) =>
+                renameProject(p.id, e.target.value)
+              }
+              onClick={() => setActiveId(p.id)}
+            />
+          </div>
+        ))}
+        <button onClick={() => createProject("New Project")}>
           + New
         </button>
       </div>
 
-      {/* PROJECT START */}
-      <div style={{ marginBottom: 12 }}>
-        <label>Project Start: </label>
-        <input
-          type="date"
-          value={projectStart}
-          onChange={(e) => setProjectStart(e.target.value)}
-        />
-      </div>
+      {/* MAIN */}
+      <div style={{ flex: 1, padding: 16 }}>
+        <button onClick={addTask}>+ Add Task</button>
 
-      <button onClick={addTask}>+ Add Task</button>
-
-      {/* GRID */}
-      <table style={{ width: "100%", marginTop: 12 }}>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Task</th>
-            <th>Dur</th>
-            <th>Start</th>
-            <th>Finish</th>
-            <th>Mode</th>
-            <th>Pred</th>
-            <th>%</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {activeProject.tasks.map((t) => (
-            <tr key={t.id}>
-              <td>{t.id}</td>
-
-              <td>
-                <input
-                  value={t.name}
-                  onChange={(e) =>
-                    updateTask(t.id, "name", e.target.value)
-                  }
-                />
-              </td>
-
-              <td>
-                <input
-                  type="number"
-                  value={t.duration}
-                  onChange={(e) =>
-                    updateTask(t.id, "duration", Number(e.target.value))
-                  }
-                />
-              </td>
-
-              {/* START (TEXT + CALENDAR) */}
-              <td>
-                <input
-                  type="date"
-                  value={t.start || ""}
-                  onChange={(e) =>
-                    updateTask(t.id, "start", e.target.value)
-                  }
-                  disabled={t.mode === "auto"}
-                />
-              </td>
-
-              {/* FINISH */}
-              <td>
-                <input
-                  type="date"
-                  value={t.finish || ""}
-                  onChange={(e) =>
-                    updateTask(t.id, "finish", e.target.value)
-                  }
-                  disabled={t.mode === "auto"}
-                />
-              </td>
-
-              {/* MODE */}
-              <td>
-                <select
-                  value={t.mode}
-                  onChange={(e) =>
-                    updateTask(
-                      t.id,
-                      "mode",
-                      e.target.value as "auto" | "manual"
-                    )
-                  }
-                >
-                  <option value="auto">Auto</option>
-                  <option value="manual">Manual</option>
-                </select>
-              </td>
-
-              <td>
-                <input
-                  value={t.predecessors || ""}
-                  onChange={(e) =>
-                    updateTask(t.id, "predecessors", e.target.value)
-                  }
-                />
-              </td>
-
-              <td>
-                <input
-                  type="number"
-                  value={t.percent}
-                  onChange={(e) =>
-                    updateTask(t.id, "percent", Number(e.target.value))
-                  }
-                />
-              </td>
+        <table style={{ width: "100%", marginTop: 12 }}>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Task Name</th>
+              <th>Duration (Days)</th>
+              <th>Start</th>
+              <th>Finish</th>
+              <th>Mode</th>
+              <th>Predecessors (FS/SS)</th>
+              <th>% Complete</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {activeProject.tasks.map((t) => {
+              if (isHidden(activeProject.tasks, t)) return null;
+
+              const level = getLevel(activeProject.tasks, t);
+
+              return (
+                <tr key={t.id}>
+                  <td>{t.id}</td>
+
+                  <td>
+                    <div style={{ paddingLeft: level * 16 }}>
+                      <button onClick={() => toggleCollapse(t)}>
+                        {t.collapsed ? "+" : "-"}
+                      </button>
+
+                      <button onClick={() => indentTask(t)}>→</button>
+                      <button onClick={() => outdentTask(t)}>←</button>
+
+                      <input
+                        value={t.name}
+                        onChange={(e) =>
+                          updateTask(t.id, "name", e.target.value)
+                        }
+                      />
+                    </div>
+                  </td>
+
+                  <td>
+                    <input
+                      type="number"
+                      value={t.duration}
+                      onChange={(e) =>
+                        updateTask(
+                          t.id,
+                          "duration",
+                          Number(e.target.value)
+                        )
+                      }
+                    />
+                  </td>
+
+                  <td>{t.start}</td>
+                  <td>{t.finish}</td>
+
+                  <td>
+                    <select
+                      value={t.mode}
+                      onChange={(e) =>
+                        updateTask(
+                          t.id,
+                          "mode",
+                          e.target.value as any
+                        )
+                      }
+                    >
+                      <option value="auto">Auto</option>
+                      <option value="manual">Manual</option>
+                    </select>
+                  </td>
+
+                  <td>
+                    <input
+                      value={t.predecessors || ""}
+                      onChange={(e) =>
+                        updateTask(
+                          t.id,
+                          "predecessors",
+                          e.target.value
+                        )
+                      }
+                    />
+                  </td>
+
+                  <td>{t.percent}%</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
