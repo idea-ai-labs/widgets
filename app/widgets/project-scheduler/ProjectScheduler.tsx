@@ -107,6 +107,24 @@ export default function ProjectScheduler() {
 
   if (!activeProject) return null;
 
+  /* ================= INPUT STYLE FIX (REMOVES DARK BORDER ISSUE) ================= */
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "4px 6px",
+    border: "1px solid #e5e5e5",
+    borderRadius: 6,
+    outline: "none",
+    fontSize: 13,
+    background: "#fff",
+  };
+
+  const readonlyStyle: React.CSSProperties = {
+    ...inputStyle,
+    background: "#f5f5f7",
+    color: "#333",
+  };
+
   return (
     <div style={{ fontFamily: "system-ui", padding: 12 }}>
       {/* HEADER */}
@@ -121,10 +139,6 @@ export default function ProjectScheduler() {
             </option>
           ))}
         </select>
-
-        <button onClick={() => alert("Add Project")}>
-          + New Project
-        </button>
 
         <button onClick={addTask}>+ Task</button>
       </div>
@@ -145,19 +159,20 @@ export default function ProjectScheduler() {
           style={{
             width: "100%",
             borderCollapse: "collapse",
-            minWidth: 900,
+            minWidth: 1000,
           }}
         >
-          {/* ================= HEADER (FIXED) ================= */}
+          {/* HEADER */}
           <thead>
             <tr>
-              <th style={{ textAlign: "left", minWidth: 220 }}>
+              <th>ID</th>
+              <th>Mode</th>
+              <th style={{ textAlign: "left", minWidth: 200 }}>
                 Task
               </th>
               <th>Duration</th>
               <th>Start</th>
               <th>Finish</th>
-              <th>Mode</th>
               <th>Predecessors</th>
               <th>% Complete</th>
               <th>WBS</th>
@@ -167,72 +182,10 @@ export default function ProjectScheduler() {
           <tbody>
             {activeProject.tasks.map((t) => (
               <tr key={t.id}>
-                {/* ================= TASK COLUMN (FIXED) ================= */}
-                <td style={{ minWidth: 220 }}>
-                  <input
-                    value={t.name}
-                    placeholder="Task name"
-                    onChange={(e) =>
-                      updateTask(t.id, "name", e.target.value)
-                    }
-                    style={{
-                      width: "100%",
-                      padding: "4px 6px",
-                      border: "1px solid #ddd",
-                      borderRadius: 6,
-                    }}
-                  />
-                </td>
+                {/* ================= ID ================= */}
+                <td>{t.id}</td>
 
-                <td>
-                  <input
-                    type="number"
-                    value={t.duration}
-                    onChange={(e) =>
-                      updateTask(
-                        t.id,
-                        "duration",
-                        Number(e.target.value)
-                      )
-                    }
-                    style={{ width: 70 }}
-                  />
-                </td>
-
-                {/* START */}
-                <td>
-                  <input
-                    type={t.mode === "manual" ? "date" : "text"}
-                    value={t.start || ""}
-                    readOnly={t.mode === "auto"}
-                    onChange={(e) =>
-                      updateTask(t.id, "start", e.target.value)
-                    }
-                    style={{
-                      width: "100%",
-                      background:
-                        t.mode === "auto" ? "#f3f3f3" : "white",
-                    }}
-                  />
-                </td>
-
-                {/* FINISH */}
-                <td>
-                  <input
-                    type={t.mode === "manual" ? "date" : "text"}
-                    value={t.finish || ""}
-                    readOnly={t.mode === "auto"}
-                    onChange={(e) =>
-                      updateTask(t.id, "finish", e.target.value)
-                    }
-                    style={{
-                      width: "100%",
-                      background:
-                        t.mode === "auto" ? "#f3f3f3" : "white",
-                    }}
-                  />
-                </td>
-
+                {/* ================= MODE (MOVED TO 2ND COL) ================= */}
                 <td>
                   <select
                     value={t.mode}
@@ -245,6 +198,68 @@ export default function ProjectScheduler() {
                   </select>
                 </td>
 
+                {/* TASK */}
+                <td>
+                  <input
+                    value={t.name}
+                    onChange={(e) =>
+                      updateTask(t.id, "name", e.target.value)
+                    }
+                    style={inputStyle}
+                  />
+                </td>
+
+                {/* DURATION */}
+                <td>
+                  <input
+                    type="number"
+                    value={t.duration}
+                    onChange={(e) =>
+                      updateTask(
+                        t.id,
+                        "duration",
+                        Number(e.target.value)
+                      )
+                    }
+                    style={{ ...inputStyle, width: 70 }}
+                  />
+                </td>
+
+                {/* START (REDUCED WIDTH + FIXED STYLE) */}
+                <td>
+                  <input
+                    type={t.mode === "manual" ? "date" : "text"}
+                    value={t.start || ""}
+                    readOnly={t.mode === "auto"}
+                    onChange={(e) =>
+                      updateTask(t.id, "start", e.target.value)
+                    }
+                    style={
+                      t.mode === "auto"
+                        ? readonlyStyle
+                        : inputStyle
+                    }
+                  />
+                </td>
+
+                {/* FINISH (REDUCED WIDTH + FIXED STYLE) */}
+                <td>
+                  <input
+                    type={t.mode === "manual" ? "date" : "text"}
+                    value={t.finish || ""}
+                    readOnly={t.mode === "auto"}
+                    onChange={(e) =>
+                      updateTask(t.id, "finish", e.target.value)
+                    }
+                    style={
+                      t.mode === "auto"
+                        ? readonlyStyle
+                        : inputStyle
+                    }
+                  />
+                </td>
+
+                {/* PREDECESSORS */}
                 <td>
                   <input
                     value={t.predecessors || ""}
@@ -255,10 +270,11 @@ export default function ProjectScheduler() {
                         e.target.value
                       )
                     }
-                    style={{ width: 120 }}
+                    style={{ ...inputStyle, width: 120 }}
                   />
                 </td>
 
+                {/* % COMPLETE */}
                 <td>
                   <input
                     type="number"
@@ -270,10 +286,11 @@ export default function ProjectScheduler() {
                         Number(e.target.value)
                       )
                     }
-                    style={{ width: 70 }}
+                    style={{ ...inputStyle, width: 70 }}
                   />
                 </td>
 
+                {/* WBS */}
                 <td>
                   <button onClick={() => indent(t)}>→</button>
                   <button onClick={() => outdent(t)}>←</button>
