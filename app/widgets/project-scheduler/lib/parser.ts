@@ -23,11 +23,12 @@ function normalizeLagUnit(raw?: string): ParsedPred["lagUnit"] {
   return undefined;
 }
 
+// ✅ Parameters reordered + idMapByDisplay made optional
 export function parsePred(
   input?: string,
-  idMapByDisplay: Map<number, string>
+  idMapByDisplay?: Map<number, string> // << required → optional
 ): ParsedPred[] {
-  if (!input?.trim()) return [];
+  if (!input?.trim() || !idMapByDisplay) return [];
 
   return input
     .split(",")
