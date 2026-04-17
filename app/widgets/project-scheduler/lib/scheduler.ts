@@ -7,7 +7,6 @@ function addDays(date: Date, days: number) {
   return d;
 }
 
-/* ✅ UPDATED: Human-readable date format */
 function format(d: Date) {
   const options: Intl.DateTimeFormatOptions = {
     weekday: "short",
@@ -19,31 +18,67 @@ function format(d: Date) {
   return d.toLocaleDateString("en-US", options);
 }
 
+function maxDate(a: Date | null, b: Date | null) {
+  if (!a) return b;
+  if (!b) return a;
+  return a > b ? a : b;
+}
+
 export function calculate(tasks: Task[], projectStart: string) {
-  return tasks.map((task, index) => {
+  return tasks.map((task) => {
     if (task.mode === "manual") return task;
 
-    let start = new Date(projectStart);
-
     const preds = parsePred(task.predecessors);
+    let start = new Date(projectStart);
+    let finish = addDays(start, task.duration);
+
+    let requiredStart: Date | null = null;
+    let requiredFinish: Date | null = null;
 
     preds.forEach((p) => {
-      const refTask = tasks[p.taskNo - 1]; // uses display order
-      if (!refTask) return;
+      const refTask = tasks[p.taskNo - 1];
+      if (!refTask?.start || !refTask?.finish) return;
 
-      const finish = refTask.finish ? new Date(refTask.finish) : null;
-      const startPt = refTask.start ? new Date(refTask.start) : null;
+      const refStart = new Date(refTask.start);
+      const refFinish = new Date(refTask.finish);
 
-      if (p.type === "FS" && finish) {
-        start = addDays(finish, 1 + p.lag);
-      }
+      const offsetDays = p.lag ?? 0;
 
-      if (p.type === "SS" && startPt) {
-        start = addDays(startPt, p.lag);
+      let candidateStart: Date | null = null;
+      let candidateFinish: Date | null = null;
+
+      switch (p.type) {
+        case "FS":
+          candidateStart = addDays(refFinish, 1 + offsetDays);
+          requiredStart = maxDate(requiredStart, candidateStart);
+          break;
+
+        case "SS":
+          candidateStart = addDays(refStart, offsetDays);
+          requiredStart = maxDate(requiredStart, candidateStart);
+          break;
+
+        case "FF":
+          candidateFinish = addDays(refFinish, offsetDays);
+          requiredFinish = maxDate(requiredFinish, candidateFinish);
+          break;
+
+        case "SF":
+          candidateFinish = addDays(refStart, offsetDays);
+          requiredFinish = maxDate(requiredFinish, candidateFinish);
+          break;
       }
     });
 
-    const finish = addDays(start, task.duration);
+    if (requiredStart) {
+      start = requiredStart;
+      finish = addDays(start, task.duration);
+    }
+
+    if (requiredFinish) {
+      finish = requiredFinish;
+      start = addDays(finish, -task.duration);
+    }
 
     return {
       ...task,
