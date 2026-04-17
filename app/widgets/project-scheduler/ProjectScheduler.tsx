@@ -26,7 +26,7 @@ type Project = {
 
 /* ================= STORAGE ================= */
 
-const STORAGE_KEY = "projects_v4";
+const STORAGE_KEY = "projects_v5";
 
 /* ================= HELPERS ================= */
 
@@ -48,13 +48,14 @@ function parsePred(pred?: string) {
   }).filter(Boolean) as { id: number; type: string }[];
 }
 
-/* ================= CALC ================= */
+/* ================= CORE SCHEDULER (FIXED) ================= */
 
 function calculate(tasks: Task[], projectStart: string) {
   const map = new Map(tasks.map((t) => [t.id, t]));
 
-  tasks.forEach((t) => {
-    if (t.mode === "manual") return;
+  return tasks.map((t) => {
+    // MANUAL = freeze dates
+    if (t.mode === "manual") return t;
 
     let start = new Date(projectStart);
 
@@ -73,14 +74,15 @@ function calculate(tasks: Task[], projectStart: string) {
       });
     }
 
-    t.start = format(start);
-    t.finish = format(addDays(start, t.duration));
+    return {
+      ...t,
+      start: format(start),
+      finish: format(addDays(start, t.duration)),
+    };
   });
-
-  return tasks;
 }
 
-/* ================= WBS HELPERS ================= */
+/* ================= WBS ================= */
 
 function getLevel(tasks: Task[], task: Task): number {
   let level = 0;
@@ -96,35 +98,12 @@ function getLevel(tasks: Task[], task: Task): number {
   return level;
 }
 
-function getChildren(tasks: Task[], parentId: number): Task[] {
-  return tasks.filter((t) => t.parentId === parentId);
-}
-
-function rollup(tasks: Task[]) {
-  const map = new Map(tasks.map((t) => [t.id, t]));
-
-  tasks.forEach((t) => {
-    const children = tasks.filter((c) => c.parentId === t.id);
-
-    if (children.length > 0) {
-      const avg =
-        children.reduce((sum, c) => sum + c.percent, 0) /
-        children.length;
-
-      t.percent = Math.round(avg);
-    }
-  });
-
-  return [...tasks];
-}
-
 function isHidden(tasks: Task[], task: Task): boolean {
   let current = task;
 
   while (current.parentId) {
     const parent = tasks.find((t) => t.id === current.parentId);
     if (!parent) break;
-
     if (parent.collapsed) return true;
     current = parent;
   }
@@ -156,6 +135,8 @@ export default function ProjectScheduler() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
   }, [projects]);
 
+  const activeProject = projects.find((p) => p.id === activeId);
+
   /* PROJECT OPS */
 
   const createProject = (name: string) => {
@@ -184,12 +165,12 @@ export default function ProjectScheduler() {
     );
   };
 
-  const activeProject = projects.find((p) => p.id === activeId);
-
   const updateTasks = (tasks: Task[]) => {
+    const recalculated = calculate(tasks, projectStart);
+
     setProjects((prev) =>
       prev.map((p) =>
-        p.id === activeId ? { ...p, tasks } : p
+        p.id === activeId ? { ...p, tasks: recalculated } : p
       )
     );
   };
@@ -199,12 +180,9 @@ export default function ProjectScheduler() {
   const updateTask = (id: number, field: keyof Task, value: any) => {
     if (!activeProject) return;
 
-    let updated = activeProject.tasks.map((t) =>
+    const updated = activeProject.tasks.map((t) =>
       t.id === id ? { ...t, [field]: value } : t
     );
-
-    updated = calculate(updated, projectStart);
-    updated = rollup(updated);
 
     updateTasks(updated);
   };
@@ -227,27 +205,6 @@ export default function ProjectScheduler() {
     ]);
   };
 
-  const indentTask = (task: Task) => {
-    const prev = activeProject?.tasks.find(
-      (t) => t.id === task.id - 1
-    );
-    if (!prev) return;
-
-    updateTasks(
-      activeProject!.tasks.map((t) =>
-        t.id === task.id ? { ...t, parentId: prev.id } : t
-      )
-    );
-  };
-
-  const outdentTask = (task: Task) => {
-    updateTasks(
-      activeProject!.tasks.map((t) =>
-        t.id === task.id ? { ...t, parentId: null } : t
-      )
-    );
-  };
-
   const toggleCollapse = (task: Task) => {
     updateTasks(
       activeProject!.tasks.map((t) =>
@@ -260,32 +217,46 @@ export default function ProjectScheduler() {
 
   if (!activeProject) return null;
 
+  /* ================= UI ================= */
+
   return (
-    <div style={{ display: "flex" }}>
-      {/* SIDEBAR */}
-      <div style={{ width: 240, borderRight: "1px solid #ddd", padding: 10 }}>
-        <h3>Projects</h3>
-        {projects.map((p) => (
-          <div key={p.id}>
-            <input
-              value={p.name}
-              onChange={(e) =>
-                renameProject(p.id, e.target.value)
-              }
-              onClick={() => setActiveId(p.id)}
-            />
-          </div>
-        ))}
-        <button onClick={() => createProject("New Project")}>
-          + New
-        </button>
+    <div style={styles.app}>
+      {/* TOP BAR */}
+      <div style={styles.topBar}>
+        <div style={styles.brand}>📊 Project Scheduler</div>
+
+        <div style={styles.projectBar}>
+          <select
+            value={activeId || ""}
+            onChange={(e) => setActiveId(e.target.value)}
+            style={styles.select}
+          >
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+
+          <button onClick={() => createProject("New Project")}>
+            + New
+          </button>
+        </div>
+
+        <input
+          type="date"
+          value={projectStart}
+          onChange={(e) => setProjectStart(e.target.value)}
+        />
       </div>
 
-      {/* MAIN */}
-      <div style={{ flex: 1, padding: 16 }}>
-        <button onClick={addTask}>+ Add Task</button>
+      {/* TABLE */}
+      <div style={styles.container}>
+        <button onClick={addTask} style={styles.primaryBtn}>
+          + Add Task
+        </button>
 
-        <table style={{ width: "100%", marginTop: 12 }}>
+        <table style={styles.table}>
           <thead>
             <tr>
               <th>ID</th>
@@ -315,14 +286,12 @@ export default function ProjectScheduler() {
                         {t.collapsed ? "+" : "-"}
                       </button>
 
-                      <button onClick={() => indentTask(t)}>→</button>
-                      <button onClick={() => outdentTask(t)}>←</button>
-
                       <input
                         value={t.name}
                         onChange={(e) =>
                           updateTask(t.id, "name", e.target.value)
                         }
+                        style={styles.input}
                       />
                     </div>
                   </td>
@@ -338,6 +307,7 @@ export default function ProjectScheduler() {
                           Number(e.target.value)
                         )
                       }
+                      style={styles.input}
                     />
                   </td>
 
@@ -370,6 +340,7 @@ export default function ProjectScheduler() {
                           e.target.value
                         )
                       }
+                      style={styles.input}
                     />
                   </td>
 
@@ -383,3 +354,65 @@ export default function ProjectScheduler() {
     </div>
   );
 }
+
+/* ================= STYLES ================= */
+
+const styles: Record<string, React.CSSProperties> = {
+  app: {
+    fontFamily:
+      "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    background: "#f5f5f7",
+    minHeight: "100vh",
+  },
+
+  topBar: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "12px 16px",
+    background: "white",
+    borderBottom: "1px solid #e5e5e5",
+  },
+
+  brand: {
+    fontSize: 18,
+    fontWeight: 600,
+  },
+
+  projectBar: {
+    display: "flex",
+    gap: 8,
+    alignItems: "center",
+  },
+
+  select: {
+    padding: 6,
+  },
+
+  container: {
+    padding: 16,
+  },
+
+  table: {
+    width: "100%",
+    marginTop: 12,
+    background: "white",
+    borderRadius: 12,
+    borderCollapse: "collapse",
+    overflow: "hidden",
+  },
+
+  input: {
+    border: "1px solid #ddd",
+    borderRadius: 6,
+    padding: 4,
+  },
+
+  primaryBtn: {
+    background: "#007aff",
+    color: "white",
+    border: "none",
+    padding: "8px 12px",
+    borderRadius: 8,
+  },
+};
