@@ -1,3 +1,5 @@
+import { DependencyType } from "./types";
+
 export type ParsedPred = {
   predecessorId: string; // stable id, not row number
   type: DependencyType;
@@ -23,7 +25,7 @@ function normalizeLagUnit(raw?: string): ParsedPred["lagUnit"] {
 
 export function parsePred(
   input?: string,
-  idMapByDisplay: Map<number, string> // displayNo → stable id
+  idMapByDisplay: Map<number, string>
 ): ParsedPred[] {
   if (!input?.trim()) return [];
 
@@ -53,7 +55,7 @@ export function parsePred(
         predecessorId: ancestorId,
         type,
         lag,
-        ...(lagMatch ? { lagUnit } : {}),
+        ...(lagUnit ? { lagUnit } : {}),
       };
     })
     .filter((x): x is ParsedPred => Boolean(x));
