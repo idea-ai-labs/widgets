@@ -1,5 +1,5 @@
 import { Task, TaskMode } from "./types";
-import { parsePred } from "./parser"; // no DependencyType here
+import { parsePred } from "./parser";
 
 function addDays(date: Date, days: number) {
   const d = new Date(date);
@@ -21,12 +21,11 @@ function format(d: Date) {
 function maxDate(a: Date | null, b: Date | null) {
   if (!a) return b;
   if (!b) return a;
-  return a > b ? a : b; // ← now valid syntax
+  return a > b ? a : b;
 }
 
 export function calculate(tasks: Task[], projectStart: string) {
-  // Build map: displayNo → stable id (if displayNo exists)
-  const idMapByDisplay = new Map<number, string>();
+  const idMapByDisplay = new Map<number, number>();
   tasks.forEach((task) => {
     const displayNo = task.displayNo ?? 0; // default to 0 if missing
     idMapByDisplay.set(displayNo, task.id);
