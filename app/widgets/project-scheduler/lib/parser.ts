@@ -1,7 +1,7 @@
-import { DependencyType } from "./types"; // << move type here
+import { DependencyType } from "./types"; // assuming DependencyType is in types.ts
 
 export type ParsedPred = {
-  predecessorId: string; // stable id, not row number
+  predecessorId: number; // stable id, not row number
   type: DependencyType;
   lag: number; // negative = lead, positive = lag
   lagUnit?: "m" | "h" | "d" | "w" | "mo" | "pct";
@@ -25,7 +25,7 @@ function normalizeLagUnit(raw?: string): ParsedPred["lagUnit"] {
 
 export function parsePred(
   input?: string,
-  idMapByDisplay?: Map<number, string>
+  idMapByDisplay?: Map<number, number>
 ): ParsedPred[] {
   if (!input?.trim() || !idMapByDisplay) return [];
 
@@ -40,7 +40,7 @@ export function parsePred(
 
       const displayNo = Number(taskNoMatch[1]);
       const ancestorId = idMapByDisplay.get(displayNo);
-      if (!ancestorId) return null;
+      if (ancestorId === undefined) return null;
 
       const typeMatch = item.match(DEP_TYPE_RE);
       const type = (typeMatch?.[1]?.toUpperCase() as DependencyType) || "FS";
