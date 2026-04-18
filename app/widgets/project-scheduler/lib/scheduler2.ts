@@ -1,5 +1,5 @@
 import { Task } from "./types";
-import { parsePred } from "./parser";
+import { parsePred } from "./parser2";
 
 function addDays(date: Date, days: number) {
   const d = new Date(date);
