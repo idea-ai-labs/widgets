@@ -1,4 +1,4 @@
-import { DependencyType } from "./types";
+import { DependencyType } from "./types"; // << move type here
 
 export type ParsedPred = {
   predecessorId: string; // stable id, not row number
@@ -23,10 +23,9 @@ function normalizeLagUnit(raw?: string): ParsedPred["lagUnit"] {
   return undefined;
 }
 
-// ✅ Parameters reordered + idMapByDisplay made optional
 export function parsePred(
   input?: string,
-  idMapByDisplay?: Map<number, string> // << required → optional
+  idMapByDisplay?: Map<number, string>
 ): ParsedPred[] {
   if (!input?.trim() || !idMapByDisplay) return [];
 
