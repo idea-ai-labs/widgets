@@ -1,5 +1,5 @@
 import { Task, TaskMode } from "./types";
-import { DependencyType, parsePred } from "./parser";
+import { parsePred } from "./parser"; // no DependencyType import here
 
 function addDays(date: Date, days: number) {
   const d = new Date(date);
@@ -21,7 +21,7 @@ function format(d: Date) {
 function maxDate(a: Date | null, b: Date | null) {
   if (!a) return b;
   if (!b) return a;
-  return a > b ? a : b;
+  return a > b ? a;
 }
 
 export function calculate(tasks: Task[], projectStart: string) {
@@ -67,7 +67,7 @@ export function calculate(tasks: Task[], projectStart: string) {
 
         case "FF":
           candidateFinish = addDays(refFinish, offsetDays);
-          requiredFinish = maxDate(requiredFinish, candidateFinish);
+          requiredFinish = maxDate(requiredFinish, candidateStart);
           break;
 
         case "SF":
