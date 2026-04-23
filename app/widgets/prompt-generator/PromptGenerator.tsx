@@ -1,7 +1,8 @@
 "use client";
- 
+
 import { useCallback, useEffect, useState } from "react";
 
+// new file
 // --- THEME DEFINITIONS ---
 export const lightTheme = {
   background: "#f5f5f7",
