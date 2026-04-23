@@ -15,14 +15,14 @@ export const lightTheme = {
 };
 
 export const darkTheme = {
-  background: "#000000",
-  card: "#1c1c1e",
-  elevated: "#2c2c2e",
+  background: "#0d0d1a",
+  card: "#13132a",
+  elevated: "#1a1a2e",
   border: "rgba(255,255,255,0.08)",
-  text: "#ffffff",
-  subtext: "rgba(235,235,245,0.6)",
+  text: "#e2e2f0",
+  subtext: "#6060a0",
   shadow: "0 10px 30px rgba(0,0,0,0.4)",
-  blur: "rgba(28,28,30,0.72)",
+  blur: "rgba(19,19,42,0.8)",
 };
 
 type AppTheme = typeof lightTheme;
@@ -53,16 +53,16 @@ const STORAGE_KEY = "prompt-generator-v2";
 const THEME_KEY = "prompt-generator-theme";
 
 const PROMPT_META: Record<PromptType, PromptMeta> = {
-  "Zero-Shot": { complexity: "Beginner", color: "#22c55e", description: "Give the AI a task with no examples — just a clear, direct instruction.", icon: "⚡" },
-  "Few-Shot": { complexity: "Beginner", color: "#22c55e", description: "Provide 2–5 input/output examples before your request.", icon: "📋" },
-  "Chain of Thought": { complexity: "Intermediate", color: "#f59e0b", description: "Force the AI to show its reasoning step-by-step.", icon: "🔗" },
-  "Prompt Chaining": { complexity: "Intermediate", color: "#f59e0b", description: "Feed one prompt’s output as the next prompt’s input.", icon: "⛓️" },
-  "Tree of Thought": { complexity: "Advanced", color: "#ef4444", description: "Multiple reasoning branches are explored simultaneously.", icon: "🌳" },
-  ReAct: { complexity: "Advanced", color: "#ef4444", description: "Combines Reasoning + Acting in a loop.", icon: "⚙️" },
-  "Role Prompting": { complexity: "Beginner", color: "#22c55e", description: "Assign the AI a specific expert persona before the task.", icon: "🎭" },
-  "Self-Consistency": { complexity: "Intermediate", color: "#f59e0b", description: "Run the same prompt multiple times and select the most consistent answer.", icon: "🔄" },
-  "Generated Knowledge": { complexity: "Intermediate", color: "#f59e0b", description: "Generate facts first, then use that knowledge to answer.", icon: "💡" },
-  "Least-to-Most": { complexity: "Intermediate", color: "#f59e0b", description: "Decompose a hard problem into simpler sub-problems.", icon: "🪜" },
+  "Zero-Shot": { complexity: "Beginner", color: "#22c55e", description: "Give the AI a task with no examples — just a clear, direct instruction. Best for simple, well-defined tasks.", icon: "⚡" },
+  "Few-Shot": { complexity: "Beginner", color: "#22c55e", description: "Provide 2–5 input/output examples before your request so the AI learns your pattern, tone, and format.", icon: "📋" },
+  "Chain of Thought": { complexity: "Intermediate", color: "#f59e0b", description: 'Force the AI to show its reasoning step-by-step before answering. Add "think step by step" to boost accuracy.', icon: "🔗" },
+  "Prompt Chaining": { complexity: "Intermediate", color: "#f59e0b", description: "Feed one prompt’s output as the next prompt’s input — building a pipeline of connected tasks.", icon: "⛓️" },
+  "Tree of Thought": { complexity: "Advanced", color: "#ef4444", description: "Multiple reasoning branches are explored simultaneously. The AI evaluates and prunes weak paths.", icon: "🌳" },
+  ReAct: { complexity: "Advanced", color: "#ef4444", description: "Combines Reasoning + Acting. The AI alternates between thinking and taking external actions in a loop.", icon: "⚙️" },
+  "Role Prompting": { complexity: "Beginner", color: "#22c55e", description: "Assign the AI a specific expert persona before the task. Dramatically shapes tone, depth, and expertise.", icon: "🎭" },
+  "Self-Consistency": { complexity: "Intermediate", color: "#f59e0b", description: "Run the same prompt multiple times with varied reasoning, then select the most consistent answer.", icon: "🔄" },
+  "Generated Knowledge": { complexity: "Intermediate", color: "#f59e0b", description: "Ask the AI to generate relevant facts FIRST, then use that knowledge to answer the main question.", icon: "💡" },
+  "Least-to-Most": { complexity: "Intermediate", color: "#f59e0b", description: "Decompose a hard problem into sub-problems, solve the simplest first, then use those to tackle harder ones.", icon: "🪜" },
 };
 
 const DEFAULT_PROMPTS: Record<PromptType, PromptFields> = {
@@ -84,7 +84,6 @@ const COMPLEXITY_STYLES: Record<Complexity, { bg: string; text: string }> = {
   Advanced: { bg: "#fee2e2", text: "#b91c1c" },
 };
 
-// --- 3. MAIN COMPONENT ---
 export default function PromptGenerator() {
   const [isDark, setIsDark] = useState(true);
   const [promptType, setPromptType] = useState<PromptType>("Zero-Shot");
@@ -97,16 +96,10 @@ export default function PromptGenerator() {
   const styles = useMemo(() => getStyles(theme), [isDark]);
 
   useEffect(() => {
-    // 1. Theme Logic
     const savedTheme = localStorage.getItem(THEME_KEY);
-    if (savedTheme) {
-      setIsDark(savedTheme === "dark");
-    } else {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      setIsDark(prefersDark);
-    }
+    if (savedTheme) setIsDark(savedTheme === "dark");
+    else setIsDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
 
-    // 2. Data Logic with Strict Type Casting
     const savedData = localStorage.getItem(STORAGE_KEY);
     if (savedData) {
       try {
@@ -115,34 +108,21 @@ export default function PromptGenerator() {
           setPromptType(parsed.promptType);
           setFields(parsed.fields || DEFAULT_PROMPTS[parsed.promptType]);
         }
-      } catch (e) {
-        console.error("Failed to load prompt data", e);
-      }
+      } catch (e) { console.error("Load failed", e); }
     }
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
-  }, [isDark]);
+  useEffect(() => { localStorage.setItem(THEME_KEY, isDark ? "dark" : "light"); }, [isDark]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify({ promptType, fields })); }, [promptType, fields]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ promptType, fields }));
-  }, [promptType, fields]);
-
-  useEffect(() => {
-    const text = Object.entries(fields)
-      .map(([k, v]) => `[${k}]\n${v}`)
-      .join("\n\n");
+    const text = Object.entries(fields).map(([k, v]) => `[${k}]\n${v}`).join("\n\n");
     setGeneratedPrompt(text);
   }, [fields]);
 
-  const handleTypeChange = useCallback((type: PromptType) => {
+  const handleTypeChange = (type: PromptType) => {
     setPromptType(type);
     setFields({ ...DEFAULT_PROMPTS[type] });
-  }, []);
-
-  const handleFieldChange = (key: string, value: string) => {
-    setFields((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleCopy = async () => {
@@ -150,9 +130,7 @@ export default function PromptGenerator() {
       await navigator.clipboard.writeText(generatedPrompt);
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
-    } catch (err) {
-      console.error("Copy failed", err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const meta = PROMPT_META[promptType];
@@ -186,8 +164,7 @@ export default function PromptGenerator() {
                 style={{
                   ...styles.typeBtn,
                   borderColor: isActive ? m.color : theme.border,
-                  background: isActive ? `${m.color}15` : theme.card,
-                  boxShadow: isActive ? theme.shadow : "none",
+                  background: isActive ? `${m.color}15` : theme.elevated,
                 }}
               >
                 <span style={{ fontSize: "14px" }}>{m.icon}</span>
@@ -201,7 +178,7 @@ export default function PromptGenerator() {
       <div style={{ ...styles.infoCard, borderColor: `${meta.color}40` }}>
         <div style={styles.infoCardHeader}>
           <span style={{ ...styles.infoIcon, background: `${meta.color}20`, color: meta.color }}>{meta.icon}</span>
-          <span style={{ ...styles.infoTitle, color: meta.color }}>{promptType}</span>
+          <span style={{ fontWeight: 700, fontSize: "16px", color: meta.color }}>{promptType}</span>
           <span style={{ ...styles.badge, background: complexStyle.bg, color: complexStyle.text }}>{meta.complexity}</span>
         </div>
         <p style={styles.infoDesc}>{meta.description}</p>
@@ -216,11 +193,11 @@ export default function PromptGenerator() {
         {activeTab === "builder" ? (
           <div style={styles.fieldsList}>
             {Object.entries(fields).map(([key, value]) => (
-              <div key={key} style={styles.fieldRow}>
+              <div key={key} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 <label style={styles.fieldLabel}>{key}</label>
                 <textarea
                   value={value}
-                  onChange={(e) => handleFieldChange(key, e.target.value)}
+                  onChange={(e) => setFields(prev => ({ ...prev, [key]: e.target.value }))}
                   style={styles.textarea}
                   rows={3}
                 />
@@ -228,9 +205,7 @@ export default function PromptGenerator() {
             ))}
           </div>
         ) : (
-          <div style={styles.previewBox}>
-            <pre style={styles.pre}>{generatedPrompt}</pre>
-          </div>
+          <div style={{ whiteSpace: "pre-wrap", fontSize: "14px", lineHeight: 1.7 }}>{generatedPrompt}</div>
         )}
       </div>
 
@@ -238,110 +213,71 @@ export default function PromptGenerator() {
         <button onClick={handleCopy} style={styles.primaryBtn}>{copied ? "✓ Copied!" : "⧉ Copy Prompt"}</button>
         <button onClick={() => setFields({ ...DEFAULT_PROMPTS[promptType] })} style={styles.secondaryBtn}>↺ Reset</button>
       </div>
+
+      {/* --- QUICK REFERENCE SECTION --- */}
+      <details style={styles.referenceDetails}>
+        <summary style={styles.referenceSummary}>📖 All Techniques Quick Reference</summary>
+        <div style={styles.referenceGrid}>
+          {PROMPT_TYPES.map((type) => {
+            const m = PROMPT_META[type];
+            const cs = COMPLEXITY_STYLES[m.complexity];
+            return (
+              <div key={type} style={{ ...styles.refCard, borderColor: `${m.color}30` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "14px" }}>{m.icon}</span>
+                  <span style={{ fontSize: "12px", fontWeight: 700, flex: 1, color: m.color }}>{type}</span>
+                  <span style={{ ...styles.badge, background: cs.bg, color: cs.text, fontSize: "8px" }}>{m.complexity}</span>
+                </div>
+                <p style={{ margin: 0, fontSize: "11px", color: theme.subtext, lineHeight: 1.4 }}>{m.description}</p>
+                <button
+                  onClick={() => { handleTypeChange(type); setActiveTab("builder"); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  style={{ ...styles.refBtn, color: m.color, borderColor: `${m.color}40` }}
+                >
+                  Use this →
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </details>
     </div>
   );
 }
 
-// --- 4. DYNAMIC STYLES GENERATOR ---
 const getStyles = (theme: AppTheme): Record<string, React.CSSProperties> => ({
   root: {
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    background: theme.background,
-    color: theme.text,
-    minHeight: "100vh",
-    padding: "40px 20px",
-    maxWidth: "860px",
-    margin: "0 auto",
-    transition: "background 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease",
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    background: theme.background, color: theme.text, minHeight: "100vh",
+    padding: "40px 20px", maxWidth: "860px", margin: "0 auto", transition: "all 0.4s ease",
   },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "32px",
-    paddingBottom: "20px",
-    borderBottom: `1px solid ${theme.border}`,
-  },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px", paddingBottom: "20px", borderBottom: `1px solid ${theme.border}` },
   headerLeft: { display: "flex", alignItems: "center", gap: "14px" },
   logo: { fontSize: "28px", color: "#818cf8" },
-  title: { fontSize: "22px", margin: 0, fontWeight: 700, letterSpacing: "-0.5px" },
-  subtitle: { fontSize: "11px", color: theme.subtext, margin: 0, textTransform: "uppercase", letterSpacing: "0.05em" },
-  themeToggle: {
-    padding: "8px 14px",
-    borderRadius: "10px",
-    border: `1px solid ${theme.border}`,
-    background: theme.elevated,
-    color: theme.text,
-    cursor: "pointer",
-    fontSize: "12px",
-    fontWeight: 600,
-    boxShadow: theme.shadow,
-    transition: "transform 0.1s active",
-  },
+  title: { fontSize: "22px", margin: 0, fontWeight: 700 },
+  subtitle: { fontSize: "11px", color: theme.subtext, margin: 0, textTransform: "uppercase" },
+  themeToggle: { padding: "8px 14px", borderRadius: "10px", border: `1px solid ${theme.border}`, background: theme.elevated, color: theme.text, cursor: "pointer", fontSize: "12px", fontWeight: 600, boxShadow: theme.shadow },
   section: { marginBottom: "24px" },
   label: { fontSize: "10px", fontWeight: 800, color: theme.subtext, marginBottom: "12px", letterSpacing: "0.1em" },
-  selectorGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-    gap: "10px",
-  },
-  typeBtn: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    padding: "12px",
-    borderRadius: "12px",
-    border: "1px solid",
-    cursor: "pointer",
-    textAlign: "left",
-    color: theme.text,
-    transition: "all 0.2s ease",
-  },
-  infoCard: {
-    background: theme.blur,
-    backdropFilter: "blur(12px)",
-    WebkitBackdropFilter: "blur(12px)",
-    border: "1px solid",
-    borderRadius: "16px",
-    padding: "20px",
-    marginBottom: "28px",
-    boxShadow: theme.shadow,
-  },
+  selectorGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "10px" },
+  typeBtn: { display: "flex", alignItems: "center", gap: "10px", padding: "12px", borderRadius: "12px", border: "1px solid", cursor: "pointer", textAlign: "left", color: theme.text, transition: "all 0.2s ease" },
+  infoCard: { background: theme.blur, backdropFilter: "blur(12px)", border: "1px solid", borderRadius: "16px", padding: "20px", marginBottom: "28px", boxShadow: theme.shadow },
   infoCardHeader: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" },
   infoIcon: { width: "32px", height: "32px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" },
-  infoTitle: { fontWeight: 700, fontSize: "16px" },
   badge: { fontSize: "9px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", textTransform: "uppercase" },
   infoDesc: { fontSize: "14px", color: theme.subtext, lineHeight: 1.6, margin: 0 },
   tabBar: { display: "flex", gap: "24px", borderBottom: `1px solid ${theme.border}`, marginBottom: "20px" },
-  tab: { padding: "10px 0", background: "none", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: 600, color: theme.subtext, borderBottom: "2px solid transparent", transition: "all 0.2s" },
+  tab: { padding: "10px 0", background: "none", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: 600, color: theme.subtext, borderBottom: "2px solid transparent" },
   tabActive: { color: theme.text, borderBottomColor: theme.text },
-  mainArea: {
-    background: theme.card,
-    borderRadius: "16px",
-    border: `1px solid ${theme.border}`,
-    padding: "24px",
-    minHeight: "300px",
-    boxShadow: theme.shadow,
-  },
+  mainArea: { background: theme.card, borderRadius: "16px", border: `1px solid ${theme.border}`, padding: "24px", minHeight: "300px", boxShadow: theme.shadow },
   fieldsList: { display: "flex", flexDirection: "column", gap: "18px" },
-  fieldRow: { display: "flex", flexDirection: "column", gap: "6px" },
   fieldLabel: { fontSize: "11px", fontWeight: 700, color: theme.subtext, textTransform: "uppercase" },
-  textarea: {
-    width: "100%",
-    padding: "12px",
-    borderRadius: "10px",
-    border: `1px solid ${theme.border}`,
-    background: theme.background,
-    color: theme.text,
-    fontSize: "14px",
-    lineHeight: 1.5,
-    outline: "none",
-    boxSizing: "border-box",
-    fontFamily: "inherit",
-  },
-  previewBox: { whiteSpace: "pre-wrap", wordBreak: "break-word" },
-  pre: { margin: 0, fontSize: "14px", color: theme.text, lineHeight: 1.7, fontFamily: "inherit" },
-  actions: { display: "flex", gap: "12px", marginTop: "32px" },
-  primaryBtn: { flex: 1, padding: "14px", borderRadius: "12px", border: "none", background: theme.text, color: theme.background, fontWeight: 700, cursor: "pointer", transition: "opacity 0.2s" },
+  textarea: { width: "100%", padding: "12px", borderRadius: "10px", border: `1px solid ${theme.border}`, background: theme.background, color: theme.text, fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" },
+  actions: { display: "flex", gap: "12px", marginTop: "32px", marginBottom: "48px" },
+  primaryBtn: { flex: 1, padding: "14px", borderRadius: "12px", border: "none", background: theme.text, color: theme.background, fontWeight: 700, cursor: "pointer" },
   secondaryBtn: { padding: "14px 24px", borderRadius: "12px", border: `1px solid ${theme.border}`, background: "transparent", color: theme.text, fontWeight: 600, cursor: "pointer" },
+  referenceDetails: { background: theme.card, border: `1px solid ${theme.border}`, borderRadius: "12px", overflow: "hidden" },
+  referenceSummary: { padding: "16px", cursor: "pointer", fontSize: "12px", fontWeight: 700, color: theme.subtext, textTransform: "uppercase", userSelect: "none" },
+  referenceGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px", padding: "0 16px 16px" },
+  refCard: { background: theme.elevated, border: "1px solid", borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "8px" },
+  refBtn: { background: "transparent", border: "1px solid", borderRadius: "6px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer", marginTop: "auto", alignSelf: "flex-start" },
 });
