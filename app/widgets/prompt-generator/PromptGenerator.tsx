@@ -38,6 +38,11 @@ type Complexity = "Beginner" | "Intermediate" | "Advanced";
 type PromptMeta = { complexity: Complexity; color: string; description: string; icon: string; };
 type PromptFields = Record<string, string>;
 
+interface StorageData {
+  promptType: PromptType;
+  fields: PromptFields;
+}
+
 const PROMPT_TYPES: PromptType[] = [
   "Zero-Shot", "Few-Shot", "Chain of Thought", "Prompt Chaining",
   "Tree of Thought", "ReAct", "Role Prompting", "Self-Consistency",
@@ -53,7 +58,7 @@ const PROMPT_META: Record<PromptType, PromptMeta> = {
   "Chain of Thought": { complexity: "Intermediate", color: "#f59e0b", description: "Force the AI to show its reasoning step-by-step.", icon: "🔗" },
   "Prompt Chaining": { complexity: "Intermediate", color: "#f59e0b", description: "Feed one prompt’s output as the next prompt’s input.", icon: "⛓️" },
   "Tree of Thought": { complexity: "Advanced", color: "#ef4444", description: "Multiple reasoning branches are explored simultaneously.", icon: "🌳" },
-  "ReAct": { complexity: "Advanced", color: "#ef4444", description: "Combines Reasoning + Acting in a loop.", icon: "⚙️" },
+  ReAct: { complexity: "Advanced", color: "#ef4444", description: "Combines Reasoning + Acting in a loop.", icon: "⚙️" },
   "Role Prompting": { complexity: "Beginner", color: "#22c55e", description: "Assign the AI a specific expert persona before the task.", icon: "🎭" },
   "Self-Consistency": { complexity: "Intermediate", color: "#f59e0b", description: "Run the same prompt multiple times and select the most consistent answer.", icon: "🔄" },
   "Generated Knowledge": { complexity: "Intermediate", color: "#f59e0b", description: "Generate facts first, then use that knowledge to answer.", icon: "💡" },
@@ -66,7 +71,7 @@ const DEFAULT_PROMPTS: Record<PromptType, PromptFields> = {
   "Chain of Thought": { Problem: "Math logic...", Instruction: "Think step by step", "Show Reasoning": "Yes" },
   "Prompt Chaining": { "Step 1": "Summarize", "Step 2": "Analyze", "Step 3": "Draft", "Step 4": "Format" },
   "Tree of Thought": { Problem: "GTM Strategy", "Expert 1 Lens": "Growth", "Expert 2 Lens": "Sales", "Expert 3 Lens": "PLG" },
-  "ReAct": { Goal: "EKS Migration Research", "Thought 1": "Check operators", "Action 1": "Search", "Observation 1": "..." },
+  ReAct: { Goal: "EKS Migration Research", "Thought 1": "Check operators", "Action 1": "Search", "Observation 1": "..." },
   "Role Prompting": { Persona: "AWS Architect", Task: "Review plan", Tone: "Technical", Context: "Migration" },
   "Self-Consistency": { Problem: "Database choice", "Run 1": "Latency focus", "Run 2": "Cost focus", "Run 3": "Simplicity focus" },
   "Generated Knowledge": { "Step 1": "Generate Facts", "Step 2": "Apply Knowledge", "Step 3": "Recommendation" },
@@ -88,13 +93,11 @@ export default function PromptGenerator() {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<"builder" | "preview">("builder");
 
-  // Get current theme object and styles
   const theme = isDark ? darkTheme : lightTheme;
   const styles = useMemo(() => getStyles(theme), [isDark]);
 
-  // Handle Initial Theme and Data Loading
   useEffect(() => {
-    // 1. Set theme based on storage or system preference
+    // 1. Theme Logic
     const savedTheme = localStorage.getItem(THEME_KEY);
     if (savedTheme) {
       setIsDark(savedTheme === "dark");
@@ -103,20 +106,21 @@ export default function PromptGenerator() {
       setIsDark(prefersDark);
     }
 
-    // 2. Load Prompt Data
+    // 2. Data Logic with Strict Type Casting
     const savedData = localStorage.getItem(STORAGE_KEY);
     if (savedData) {
       try {
-        const parsed = JSON.parse(savedData);
-        if (parsed.promptType) {
+        const parsed = JSON.parse(savedData) as Partial<StorageData>;
+        if (parsed.promptType && DEFAULT_PROMPTS[parsed.promptType]) {
           setPromptType(parsed.promptType);
           setFields(parsed.fields || DEFAULT_PROMPTS[parsed.promptType]);
         }
-      } catch (e) { console.error("Failed to load prompt data", e); }
+      } catch (e) {
+        console.error("Failed to load prompt data", e);
+      }
     }
   }, []);
 
-  // Persist Theme and Data
   useEffect(() => {
     localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
   }, [isDark]);
@@ -125,7 +129,6 @@ export default function PromptGenerator() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ promptType, fields }));
   }, [promptType, fields]);
 
-  // Generate Prompt Text
   useEffect(() => {
     const text = Object.entries(fields)
       .map(([k, v]) => `[${k}]\n${v}`)
@@ -147,7 +150,9 @@ export default function PromptGenerator() {
       await navigator.clipboard.writeText(generatedPrompt);
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
-    } catch (err) { console.error("Copy failed", err); }
+    } catch (err) {
+      console.error("Copy failed", err);
+    }
   };
 
   const meta = PROMPT_META[promptType];
@@ -155,7 +160,6 @@ export default function PromptGenerator() {
 
   return (
     <div style={styles.root}>
-      {/* HEADER */}
       <header style={styles.header}>
         <div style={styles.headerLeft}>
           <span style={styles.logo}>✦</span>
@@ -169,7 +173,6 @@ export default function PromptGenerator() {
         </button>
       </header>
 
-      {/* SELECTOR */}
       <div style={styles.section}>
         <p style={styles.label}>SELECT TECHNIQUE</p>
         <div style={styles.selectorGrid}>
@@ -195,7 +198,6 @@ export default function PromptGenerator() {
         </div>
       </div>
 
-      {/* INFO CARD */}
       <div style={{ ...styles.infoCard, borderColor: `${meta.color}40` }}>
         <div style={styles.infoCardHeader}>
           <span style={{ ...styles.infoIcon, background: `${meta.color}20`, color: meta.color }}>{meta.icon}</span>
@@ -205,13 +207,11 @@ export default function PromptGenerator() {
         <p style={styles.infoDesc}>{meta.description}</p>
       </div>
 
-      {/* TABS */}
       <div style={styles.tabBar}>
         <button onClick={() => setActiveTab("builder")} style={{ ...styles.tab, ...(activeTab === "builder" ? styles.tabActive : {}) }}>⚒ Builder</button>
         <button onClick={() => setActiveTab("preview")} style={{ ...styles.tab, ...(activeTab === "preview" ? styles.tabActive : {}) }}>👁 Preview</button>
       </div>
 
-      {/* MAIN CONTENT AREA */}
       <div style={styles.mainArea}>
         {activeTab === "builder" ? (
           <div style={styles.fieldsList}>
@@ -234,7 +234,6 @@ export default function PromptGenerator() {
         )}
       </div>
 
-      {/* ACTIONS */}
       <div style={styles.actions}>
         <button onClick={handleCopy} style={styles.primaryBtn}>{copied ? "✓ Copied!" : "⧉ Copy Prompt"}</button>
         <button onClick={() => setFields({ ...DEFAULT_PROMPTS[promptType] })} style={styles.secondaryBtn}>↺ Reset</button>
