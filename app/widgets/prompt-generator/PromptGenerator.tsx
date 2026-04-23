@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 
-// new file
-// --- THEME DEFINITIONS ---
+// --- 1. THEME DEFINITIONS ---
 export const lightTheme = {
   background: "#f5f5f7",
   card: "#ffffff",
@@ -26,16 +25,27 @@ export const darkTheme = {
   blur: "rgba(28,28,30,0.72)",
 };
 
-type ThemeType = typeof lightTheme;
+type AppTheme = typeof lightTheme;
 
-// --- TYPES & CONSTANTS ---
-type PromptType = "Zero-Shot" | "Few-Shot" | "Chain of Thought" | "Prompt Chaining" | "Tree of Thought" | "ReAct" | "Role Prompting" | "Self-Consistency" | "Generated Knowledge" | "Least-to-Most";
+// --- 2. TYPES & CONSTANTS ---
+type PromptType =
+  | "Zero-Shot" | "Few-Shot" | "Chain of Thought" | "Prompt Chaining"
+  | "Tree of Thought" | "ReAct" | "Role Prompting" | "Self-Consistency"
+  | "Generated Knowledge" | "Least-to-Most";
+
 type Complexity = "Beginner" | "Intermediate" | "Advanced";
+
 type PromptMeta = { complexity: Complexity; color: string; description: string; icon: string; };
 type PromptFields = Record<string, string>;
 
-const PROMPT_TYPES: PromptType[] = ["Zero-Shot", "Few-Shot", "Chain of Thought", "Prompt Chaining", "Tree of Thought", "ReAct", "Role Prompting", "Self-Consistency", "Generated Knowledge", "Least-to-Most"];
+const PROMPT_TYPES: PromptType[] = [
+  "Zero-Shot", "Few-Shot", "Chain of Thought", "Prompt Chaining",
+  "Tree of Thought", "ReAct", "Role Prompting", "Self-Consistency",
+  "Generated Knowledge", "Least-to-Most",
+];
+
 const STORAGE_KEY = "prompt-generator-v2";
+const THEME_KEY = "prompt-generator-theme";
 
 const PROMPT_META: Record<PromptType, PromptMeta> = {
   "Zero-Shot": { complexity: "Beginner", color: "#22c55e", description: "Give the AI a task with no examples — just a clear, direct instruction.", icon: "⚡" },
@@ -54,55 +64,78 @@ const DEFAULT_PROMPTS: Record<PromptType, PromptFields> = {
   "Zero-Shot": { Task: "Summarize the article...", Constraints: "Keep it under 200 words", Format: "3 bullet points" },
   "Few-Shot": { "Example 1 Input": "Review: 'Great!'", "Example 1 Output": "Positive", "Your Input": "Review: 'Works perfectly'", Task: "Classify sentiment" },
   "Chain of Thought": { Problem: "Math logic...", Instruction: "Think step by step", "Show Reasoning": "Yes" },
-  "Prompt Chaining": { "Step 1": "Summarize...", "Step 2": "Analyze...", "Step 3": "Draft..." },
-  "Tree of Thought": { Problem: "GTM Strategy...", "Expert 1 Lens": "Growth hacking", "Expert 2 Lens": "Enterprise sales" },
-  "ReAct": { Goal: "Research Spark on EKS", "Thought 1": "Identify operators", "Action 1": "Search..." },
-  "Role Prompting": { Persona: "Senior AWS Architect", Task: "Review migration plan", Tone: "Technical" },
-  "Self-Consistency": { Problem: "Database choice...", Instruction: "Answer 3 times independently" },
-  "Generated Knowledge": { "Step 1": "Generate Facts", "Step 2": "Apply Knowledge" },
-  "Least-to-Most": { "Complex Goal": "Legal resolution timeline", "Sub-problem 1": "Stages of process" },
+  "Prompt Chaining": { "Step 1": "Summarize", "Step 2": "Analyze", "Step 3": "Draft", "Step 4": "Format" },
+  "Tree of Thought": { Problem: "GTM Strategy", "Expert 1 Lens": "Growth", "Expert 2 Lens": "Sales", "Expert 3 Lens": "PLG" },
+  "ReAct": { Goal: "EKS Migration Research", "Thought 1": "Check operators", "Action 1": "Search", "Observation 1": "..." },
+  "Role Prompting": { Persona: "AWS Architect", Task: "Review plan", Tone: "Technical", Context: "Migration" },
+  "Self-Consistency": { Problem: "Database choice", "Run 1": "Latency focus", "Run 2": "Cost focus", "Run 3": "Simplicity focus" },
+  "Generated Knowledge": { "Step 1": "Generate Facts", "Step 2": "Apply Knowledge", "Step 3": "Recommendation" },
+  "Least-to-Most": { "Complex Goal": "Legal resolution", "Sub-problem 1": "Stages", "Sub-problem 2": "Duration" },
 };
 
-const emptyFields = (type: PromptType): PromptFields => ({ ...DEFAULT_PROMPTS[type] });
+const COMPLEXITY_STYLES: Record<Complexity, { bg: string; text: string }> = {
+  Beginner: { bg: "#dcfce7", text: "#15803d" },
+  Intermediate: { bg: "#fef9c3", text: "#a16207" },
+  Advanced: { bg: "#fee2e2", text: "#b91c1c" },
+};
 
-// --- MAIN COMPONENT ---
+// --- 3. MAIN COMPONENT ---
 export default function PromptGenerator() {
   const [isDark, setIsDark] = useState(true);
   const [promptType, setPromptType] = useState<PromptType>("Zero-Shot");
-  const [fields, setFields] = useState<PromptFields>(() => emptyFields("Zero-Shot"));
+  const [fields, setFields] = useState<PromptFields>(() => ({ ...DEFAULT_PROMPTS["Zero-Shot"] }));
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<"builder" | "preview">("builder");
 
+  // Get current theme object and styles
   const theme = isDark ? darkTheme : lightTheme;
-  const styles = getStyles(theme);
+  const styles = useMemo(() => getStyles(theme), [isDark]);
 
-  // Persistence
+  // Handle Initial Theme and Data Loading
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
+    // 1. Set theme based on storage or system preference
+    const savedTheme = localStorage.getItem(THEME_KEY);
+    if (savedTheme) {
+      setIsDark(savedTheme === "dark");
+    } else {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      setIsDark(prefersDark);
+    }
+
+    // 2. Load Prompt Data
+    const savedData = localStorage.getItem(STORAGE_KEY);
+    if (savedData) {
       try {
-        const parsed = JSON.parse(saved);
+        const parsed = JSON.parse(savedData);
         if (parsed.promptType) {
           setPromptType(parsed.promptType);
           setFields(parsed.fields || DEFAULT_PROMPTS[parsed.promptType]);
         }
-      } catch (e) { console.error(e); }
+      } catch (e) { console.error("Failed to load prompt data", e); }
     }
   }, []);
+
+  // Persist Theme and Data
+  useEffect(() => {
+    localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
+  }, [isDark]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ promptType, fields }));
   }, [promptType, fields]);
 
+  // Generate Prompt Text
   useEffect(() => {
-    const text = Object.entries(fields).map(([k, v]) => `[${k}]\n${v}`).join("\n\n");
+    const text = Object.entries(fields)
+      .map(([k, v]) => `[${k}]\n${v}`)
+      .join("\n\n");
     setGeneratedPrompt(text);
   }, [fields]);
 
   const handleTypeChange = useCallback((type: PromptType) => {
     setPromptType(type);
-    setFields(emptyFields(type));
+    setFields({ ...DEFAULT_PROMPTS[type] });
   }, []);
 
   const handleFieldChange = (key: string, value: string) => {
@@ -110,169 +143,206 @@ export default function PromptGenerator() {
   };
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(generatedPrompt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
+    try {
+      await navigator.clipboard.writeText(generatedPrompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch (err) { console.error("Copy failed", err); }
   };
 
   const meta = PROMPT_META[promptType];
+  const complexStyle = COMPLEXITY_STYLES[meta.complexity];
 
   return (
     <div style={styles.root}>
-      {/* Header & Theme Toggle */}
-      <div style={styles.header}>
+      {/* HEADER */}
+      <header style={styles.header}>
         <div style={styles.headerLeft}>
           <span style={styles.logo}>✦</span>
           <div>
             <h1 style={styles.title}>Prompt Engineer</h1>
-            <p style={styles.subtitle}>Structure your logic</p>
+            <p style={styles.subtitle}>10 techniques · structured builder</p>
           </div>
         </div>
         <button onClick={() => setIsDark(!isDark)} style={styles.themeToggle}>
-          {isDark ? "☀️ Light" : "🌙 Dark"}
+          {isDark ? "☀️ Light Mode" : "🌙 Dark Mode"}
         </button>
+      </header>
+
+      {/* SELECTOR */}
+      <div style={styles.section}>
+        <p style={styles.label}>SELECT TECHNIQUE</p>
+        <div style={styles.selectorGrid}>
+          {PROMPT_TYPES.map((type) => {
+            const isActive = promptType === type;
+            const m = PROMPT_META[type];
+            return (
+              <button
+                key={type}
+                onClick={() => handleTypeChange(type)}
+                style={{
+                  ...styles.typeBtn,
+                  borderColor: isActive ? m.color : theme.border,
+                  background: isActive ? `${m.color}15` : theme.card,
+                  boxShadow: isActive ? theme.shadow : "none",
+                }}
+              >
+                <span style={{ fontSize: "14px" }}>{m.icon}</span>
+                <span style={{ flex: 1, fontSize: "12px", fontWeight: 600 }}>{type}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Technique Selector */}
-      <div style={styles.selectorGrid}>
-        {PROMPT_TYPES.map((type) => {
-          const isActive = promptType === type;
-          return (
-            <button
-              key={type}
-              onClick={() => handleTypeChange(type)}
-              style={{
-                ...styles.typeBtn,
-                borderColor: isActive ? meta.color : theme.border,
-                background: isActive ? `${meta.color}15` : theme.card,
-                color: theme.text
-              }}
-            >
-              {PROMPT_META[type].icon} {type}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Info Card */}
+      {/* INFO CARD */}
       <div style={{ ...styles.infoCard, borderColor: `${meta.color}40` }}>
-        <h3 style={{ color: meta.color, margin: "0 0 4px 0" }}>{promptType}</h3>
+        <div style={styles.infoCardHeader}>
+          <span style={{ ...styles.infoIcon, background: `${meta.color}20`, color: meta.color }}>{meta.icon}</span>
+          <span style={{ ...styles.infoTitle, color: meta.color }}>{promptType}</span>
+          <span style={{ ...styles.badge, background: complexStyle.bg, color: complexStyle.text }}>{meta.complexity}</span>
+        </div>
         <p style={styles.infoDesc}>{meta.description}</p>
       </div>
 
-      {/* Tabs */}
+      {/* TABS */}
       <div style={styles.tabBar}>
-        <button onClick={() => setActiveTab("builder")} style={{...styles.tab, ...(activeTab === "builder" ? styles.tabActive : {})}}>Builder</button>
-        <button onClick={() => setActiveTab("preview")} style={{...styles.tab, ...(activeTab === "preview" ? styles.tabActive : {})}}>Preview</button>
+        <button onClick={() => setActiveTab("builder")} style={{ ...styles.tab, ...(activeTab === "builder" ? styles.tabActive : {}) }}>⚒ Builder</button>
+        <button onClick={() => setActiveTab("preview")} style={{ ...styles.tab, ...(activeTab === "preview" ? styles.tabActive : {}) }}>👁 Preview</button>
       </div>
 
-      {/* Content */}
-      <div style={styles.contentArea}>
+      {/* MAIN CONTENT AREA */}
+      <div style={styles.mainArea}>
         {activeTab === "builder" ? (
-          <div style={styles.fields}>
+          <div style={styles.fieldsList}>
             {Object.entries(fields).map(([key, value]) => (
               <div key={key} style={styles.fieldRow}>
                 <label style={styles.fieldLabel}>{key}</label>
                 <textarea
                   value={value}
                   onChange={(e) => handleFieldChange(key, e.target.value)}
-                  style={styles.fieldInput}
+                  style={styles.textarea}
                   rows={3}
                 />
               </div>
             ))}
           </div>
         ) : (
-          <pre style={styles.previewText}>{generatedPrompt}</pre>
+          <div style={styles.previewBox}>
+            <pre style={styles.pre}>{generatedPrompt}</pre>
+          </div>
         )}
       </div>
 
+      {/* ACTIONS */}
       <div style={styles.actions}>
-        <button onClick={handleCopy} style={styles.copyBtn}>
-          {copied ? "✓ Copied" : "Copy Prompt"}
-        </button>
-        <button onClick={() => setFields(emptyFields(promptType))} style={styles.resetBtn}>Reset</button>
+        <button onClick={handleCopy} style={styles.primaryBtn}>{copied ? "✓ Copied!" : "⧉ Copy Prompt"}</button>
+        <button onClick={() => setFields({ ...DEFAULT_PROMPTS[promptType] })} style={styles.secondaryBtn}>↺ Reset</button>
       </div>
     </div>
   );
 }
 
-// --- DYNAMIC STYLES ---
-const getStyles = (theme: ThemeType): Record<string, React.CSSProperties> => ({
+// --- 4. DYNAMIC STYLES GENERATOR ---
+const getStyles = (theme: AppTheme): Record<string, React.CSSProperties> => ({
   root: {
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     background: theme.background,
     color: theme.text,
     minHeight: "100vh",
     padding: "40px 20px",
-    maxWidth: "800px",
+    maxWidth: "860px",
     margin: "0 auto",
-    transition: "background 0.3s ease, color 0.3s ease",
+    transition: "background 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease",
   },
   header: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: "32px",
+    paddingBottom: "20px",
+    borderBottom: `1px solid ${theme.border}`,
   },
-  headerLeft: { display: "flex", alignItems: "center", gap: "12px" },
-  logo: { fontSize: "32px" },
-  title: { fontSize: "24px", margin: 0, fontWeight: 700 },
-  subtitle: { fontSize: "12px", color: theme.subtext, margin: 0, textTransform: "uppercase" },
+  headerLeft: { display: "flex", alignItems: "center", gap: "14px" },
+  logo: { fontSize: "28px", color: "#818cf8" },
+  title: { fontSize: "22px", margin: 0, fontWeight: 700, letterSpacing: "-0.5px" },
+  subtitle: { fontSize: "11px", color: theme.subtext, margin: 0, textTransform: "uppercase", letterSpacing: "0.05em" },
   themeToggle: {
-    padding: "8px 16px",
-    borderRadius: "20px",
+    padding: "8px 14px",
+    borderRadius: "10px",
     border: `1px solid ${theme.border}`,
     background: theme.elevated,
     color: theme.text,
     cursor: "pointer",
     fontSize: "12px",
     fontWeight: 600,
+    boxShadow: theme.shadow,
+    transition: "transform 0.1s active",
   },
+  section: { marginBottom: "24px" },
+  label: { fontSize: "10px", fontWeight: 800, color: theme.subtext, marginBottom: "12px", letterSpacing: "0.1em" },
   selectorGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
-    gap: "8px",
-    marginBottom: "24px",
+    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+    gap: "10px",
   },
   typeBtn: {
-    padding: "10px",
-    borderRadius: "10px",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "12px",
+    borderRadius: "12px",
     border: "1px solid",
     cursor: "pointer",
-    fontSize: "13px",
     textAlign: "left",
-    transition: "all 0.2s",
+    color: theme.text,
+    transition: "all 0.2s ease",
   },
   infoCard: {
     background: theme.blur,
-    backdropFilter: "blur(10px)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
     border: "1px solid",
-    borderRadius: "12px",
+    borderRadius: "16px",
     padding: "20px",
-    marginBottom: "24px",
+    marginBottom: "28px",
     boxShadow: theme.shadow,
   },
-  infoDesc: { fontSize: "14px", color: theme.subtext, lineHeight: 1.5 },
-  tabBar: { display: "flex", gap: "20px", borderBottom: `1px solid ${theme.border}`, marginBottom: "20px" },
-  tab: { padding: "10px 0", background: "none", border: "none", color: theme.subtext, cursor: "pointer", borderBottom: "2px solid transparent" },
-  tabActive: { color: theme.text, borderBottomColor: theme.text, fontWeight: 600 },
-  contentArea: { background: theme.card, borderRadius: "12px", padding: "20px", border: `1px solid ${theme.border}` },
-  fieldRow: { marginBottom: "16px" },
-  fieldLabel: { display: "block", fontSize: "11px", fontWeight: 700, color: theme.subtext, marginBottom: "6px", textTransform: "uppercase" },
-  fieldInput: {
+  infoCardHeader: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" },
+  infoIcon: { width: "32px", height: "32px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" },
+  infoTitle: { fontWeight: 700, fontSize: "16px" },
+  badge: { fontSize: "9px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", textTransform: "uppercase" },
+  infoDesc: { fontSize: "14px", color: theme.subtext, lineHeight: 1.6, margin: 0 },
+  tabBar: { display: "flex", gap: "24px", borderBottom: `1px solid ${theme.border}`, marginBottom: "20px" },
+  tab: { padding: "10px 0", background: "none", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: 600, color: theme.subtext, borderBottom: "2px solid transparent", transition: "all 0.2s" },
+  tabActive: { color: theme.text, borderBottomColor: theme.text },
+  mainArea: {
+    background: theme.card,
+    borderRadius: "16px",
+    border: `1px solid ${theme.border}`,
+    padding: "24px",
+    minHeight: "300px",
+    boxShadow: theme.shadow,
+  },
+  fieldsList: { display: "flex", flexDirection: "column", gap: "18px" },
+  fieldRow: { display: "flex", flexDirection: "column", gap: "6px" },
+  fieldLabel: { fontSize: "11px", fontWeight: 700, color: theme.subtext, textTransform: "uppercase" },
+  textarea: {
     width: "100%",
     padding: "12px",
-    borderRadius: "8px",
+    borderRadius: "10px",
     border: `1px solid ${theme.border}`,
     background: theme.background,
     color: theme.text,
     fontSize: "14px",
+    lineHeight: 1.5,
     outline: "none",
     boxSizing: "border-box",
+    fontFamily: "inherit",
   },
-  previewText: { whiteSpace: "pre-wrap", fontSize: "14px", color: theme.text, margin: 0 },
-  actions: { display: "flex", gap: "12px", marginTop: "24px" },
-  copyBtn: { flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: theme.text, color: theme.background, fontWeight: 600, cursor: "pointer" },
-  resetBtn: { padding: "12px 24px", borderRadius: "8px", border: `1px solid ${theme.border}`, background: "transparent", color: theme.text, cursor: "pointer" },
+  previewBox: { whiteSpace: "pre-wrap", wordBreak: "break-word" },
+  pre: { margin: 0, fontSize: "14px", color: theme.text, lineHeight: 1.7, fontFamily: "inherit" },
+  actions: { display: "flex", gap: "12px", marginTop: "32px" },
+  primaryBtn: { flex: 1, padding: "14px", borderRadius: "12px", border: "none", background: theme.text, color: theme.background, fontWeight: 700, cursor: "pointer", transition: "opacity 0.2s" },
+  secondaryBtn: { padding: "14px 24px", borderRadius: "12px", border: `1px solid ${theme.border}`, background: "transparent", color: theme.text, fontWeight: 600, cursor: "pointer" },
 });
