@@ -66,16 +66,98 @@ const PROMPT_META: Record<PromptType, PromptMeta> = {
 };
 
 const DEFAULT_PROMPTS: Record<PromptType, PromptFields> = {
-  "Zero-Shot": { Task: "Summarize the article...", Constraints: "Keep it under 200 words", Format: "3 bullet points" },
-  "Few-Shot": { "Example 1 Input": "Review: 'Great!'", "Example 1 Output": "Positive", "Your Input": "Review: 'Works perfectly'", Task: "Classify sentiment" },
-  "Chain of Thought": { Problem: "Math logic...", Instruction: "Think step by step", "Show Reasoning": "Yes" },
-  "Prompt Chaining": { "Step 1": "Summarize", "Step 2": "Analyze", "Step 3": "Draft", "Step 4": "Format" },
-  "Tree of Thought": { Problem: "GTM Strategy", "Expert 1 Lens": "Growth", "Expert 2 Lens": "Sales", "Expert 3 Lens": "PLG" },
-  ReAct: { Goal: "EKS Migration Research", "Thought 1": "Check operators", "Action 1": "Search", "Observation 1": "..." },
-  "Role Prompting": { Persona: "AWS Architect", Task: "Review plan", Tone: "Technical", Context: "Migration" },
-  "Self-Consistency": { Problem: "Database choice", "Run 1": "Latency focus", "Run 2": "Cost focus", "Run 3": "Simplicity focus" },
-  "Generated Knowledge": { "Step 1": "Generate Facts", "Step 2": "Apply Knowledge", "Step 3": "Recommendation" },
-  "Least-to-Most": { "Complex Goal": "Legal resolution", "Sub-problem 1": "Stages", "Sub-problem 2": "Duration" },
+  "Zero-Shot": {
+    Task: "Summarize the article about renewable energy trends",
+    Constraints: "Keep it under 200 words, use plain language",
+    Format: "Return as 3 concise bullet points",
+  },
+  "Few-Shot": {
+    "Example 1 Input": "Review: 'Great product, love it!'",
+    "Example 1 Output": "Sentiment: Positive",
+    "Example 2 Input": "Review: 'Terrible, broke in a week.'",
+    "Example 2 Output": "Sentiment: Negative",
+    "Example 3 Input": "Review: 'Decent but shipping was slow.'",
+    "Example 3 Output": "Sentiment: Mixed",
+    "Your Input": "Review: 'Works perfectly, very happy with the purchase.'",
+    Task: "Classify the sentiment of the input above using the examples as reference",
+  },
+  "Chain of Thought": {
+    Problem:
+      "A store has 48 apples. They sell 1/3 in the morning and 12 more in the afternoon. How many remain?",
+    Instruction: "Think step by step before giving your final answer",
+    "Show Reasoning": "Yes — write out each calculation clearly",
+    "Final Answer Format": "State the answer in the last line",
+  },
+  "Prompt Chaining": {
+    "Step 1 — Summarize":
+      "Summarize this 10-page report into 5 bullet points: [paste report here]",
+    "Step 2 — Analyze":
+      "Based on those 5 bullet points, identify the top 3 risks",
+    "Step 3 — Draft":
+      "Write an executive summary paragraph using the risks identified",
+    "Step 4 — Format":
+      "Create 3 slide titles for a presentation based on the executive summary",
+    Note: "Feed the output of each step as input to the next",
+  },
+  "Tree of Thought": {
+    Problem:
+      "Find the best go-to-market strategy for a B2B SaaS product targeting mid-size banks",
+    Instruction:
+      "Imagine 3 expert strategists each share one step of their thinking, then continue to the next step. If any expert finds a flaw in their reasoning, they drop out.",
+    "Expert 1 Lens": "Growth hacking and viral adoption",
+    "Expert 2 Lens": "Enterprise sales and compliance",
+    "Expert 3 Lens": "Product-led growth and freemium",
+    "Evaluation Criteria": "Fastest path to 10 paying customers",
+  },
+  ReAct: {
+    Goal: "Research the current best practices for migrating PySpark workloads to Amazon EKS",
+    "Thought 1": "I need to identify current EKS-compatible Spark operators",
+    "Action 1": "Search: 'Amazon EKS Spark operator 2025 best practices'",
+    "Observation 1": "[Insert search result here]",
+    "Thought 2": "Now I need cost optimization strategies",
+    "Action 2": "Search: 'PySpark EKS spot instances cost optimization'",
+    "Observation 2": "[Insert search result here]",
+    "Final Answer": "Synthesize findings into a migration recommendation",
+  },
+  "Role Prompting": {
+    Persona:
+      "You are a senior AWS cloud architect with 10 years of EKS and data engineering experience",
+    Tone: "Technical but accessible — write for an engineering lead audience",
+    Task: "Review the following migration plan and identify the top 3 risks",
+    Context: "The team is migrating from EC2-based PySpark to Amazon EKS",
+    Constraints: "Focus on operational risk, not cost",
+    "Output Format": "Numbered list with a brief mitigation for each risk",
+  },
+  "Self-Consistency": {
+    Problem:
+      "What is the best database for a real-time analytics platform with 50M daily events?",
+    Instruction:
+      "Answer this question 3 times independently, each time using a different reasoning approach",
+    "Run 1 Approach": "Focus on query performance and latency",
+    "Run 2 Approach": "Focus on cost and scalability",
+    "Run 3 Approach": "Focus on operational simplicity and team familiarity",
+    "Final Step":
+      "Compare the 3 answers and recommend the most consistent choice",
+  },
+  "Generated Knowledge": {
+    "Step 1 — Generate Facts":
+      "List 5 key facts about Coronary Artery Calcium (CAC) scoring methodology and what each score range means clinically",
+    "Step 2 — Apply Knowledge":
+      "Based on those facts, explain how a radiologist would interpret a CAC score of 150 for a 55-year-old male with no symptoms",
+    "Step 3 — Recommendation":
+      "What lifestyle or clinical follow-up steps are typically recommended at this score level?",
+    Note: "Complete Step 1 fully before proceeding to Step 2",
+  },
+  "Least-to-Most": {
+    "Complex Goal":
+      "Determine whether a Virginia DPOR complaint filed in January 2025 would be resolved before year-end",
+    "Sub-problem 1 (Simplest)": "What are the stages of the Virginia DPOR complaint process?",
+    "Sub-problem 2": "What is the typical duration for each stage?",
+    "Sub-problem 3": "What factors can extend or shorten the timeline?",
+    "Sub-problem 4 (Hardest)":
+      "Given a January 2025 filing date and average timelines, project a likely resolution date",
+    Note: "Solve each sub-problem in order before attempting the next",
+  },
 };
 
 const COMPLEXITY_STYLES: Record<Complexity, { bg: string; text: string }> = {
